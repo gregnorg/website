@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="North &amp; Pine helps growing teams build clear, thoughtful digital experiences."
+    />
+    <title>North &amp; Pine — Thoughtful digital work</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="logo" href="#top" aria-label="North and Pine home">
+        <span class="logo-mark">N</span>
+        <span>North &amp; Pine</span>
+      </a>
+
+      <button class="menu-button" aria-expanded="false" aria-controls="site-nav">
+        <span></span><span></span><span></span>
+        <span class="sr-only">Open menu</span>
+      </button>
+
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <a href="#work">What we do</a>
+        <a href="#about">About</a>
+        <a class="nav-cta" href="#contact">Let's talk</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> Independent creative studio</p>
+          <h1>Good ideas deserve a <em>clear way forward.</em></h1>
+          <p class="hero-intro">
+            We help ambitious teams turn thoughtful ideas into digital experiences
+            people understand, trust, and enjoy using.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#contact">Start a project <span>↗</span></a>
+            <a class="text-link" href="#work">See what we do <span>↓</span></a>
+          </div>
+        </div>
+
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-orbit orbit-one"></div>
+          <div class="art-orbit orbit-two"></div>
+          <div class="art-card card-main">
+            <div class="mini-label">A better path</div>
+            <div class="path-line">
+              <span></span><span></span><span></span>
+            </div>
+            <p>Strategy that becomes momentum.</p>
+          </div>
+          <div class="art-card card-small">
+            <span class="spark">✦</span>
+            <strong>Made with care</strong>
+          </div>
+          <div class="dot-grid"></div>
+        </div>
+      </section>
+
+      <section id="work" class="services section-wrap">
+        <div class="section-heading">
+          <p class="eyebrow"><span></span> What we do</p>
+          <h2>From first thought<br />to finished thing.</h2>
+          <p>Focused support for the moments that move your business forward.</p>
+        </div>
+
+        <div class="service-grid">
+          <article class="service-card">
+            <span class="card-number">01</span>
+            <div class="service-icon">◎</div>
+            <h3>Strategy</h3>
+            <p>Find the signal in the noise and shape a plan your team can act on.</p>
+          </article>
+          <article class="service-card featured">
+            <span class="card-number">02</span>
+            <div class="service-icon">◇</div>
+            <h3>Design</h3>
+            <p>Create a clear, distinctive identity and an experience built around real people.</p>
+          </article>
+          <article class="service-card">
+            <span class="card-number">03</span>
+            <div class="service-icon">↗</div>
+            <h3>Build</h3>
+            <p>Bring the work to life with fast, flexible, and thoughtfully crafted technology.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="about" class="about section-wrap">
+        <p class="eyebrow light"><span></span> Our approach</p>
+        <div class="about-grid">
+          <h2>Small team.<br />Big attention.</h2>
+          <div>
+            <p>
+              We stay close to the work and close to the people behind it. No bloated
+              process, no hand-offs to strangers—just honest collaboration and careful craft.
+            </p>
+            <a class="text-link light" href="#contact">Get to know us <span>→</span></a>
+          </div>
+        </div>
+      </section>
+
+      <section id="contact" class="contact section-wrap">
+        <p class="eyebrow"><span></span> Have something in mind?</p>
+        <h2>Let's make it happen.</h2>
+        <a class="button button-primary" href="mailto:hello@example.com">hello@example.com <span>↗</span></a>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="logo" href="#top"><span class="logo-mark">N</span><span>North &amp; Pine</span></a>
+      <p>Thoughtful work for growing ideas.</p>
+      <p>© <span id="year"></span> North &amp; Pine</p>
+    </footer>
+  </body>
+</html>
