@@ -32,4 +32,10 @@ input:focus { outline:2px solid var(--accent); outline-offset:1px; }
 .page-heading h1 { margin:0; font-size:42px; }
 .empty { margin-top:42px; padding:55px 24px; border:1px dashed #aeb5b0; text-align:center; background:var(--white); }
 .empty h2 { margin-bottom:8px; }.empty p { margin:0; color:var(--muted); }
+.form-actions { display:flex; align-items:center; gap:20px; }
+.game-list { display:grid; gap:12px; margin-top:42px; }
+.game-card { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:20px 22px; border:1px solid var(--line); background:var(--white); }
+.game-card h2 { margin-bottom:4px; font-size:20px; }
+.game-card p { margin:0; color:var(--muted); font-size:14px; }
+.status { padding:4px 9px; border-radius:999px; color:var(--accent); background:#e5eee9; font-size:12px; font-weight:700; text-transform:capitalize; }
 @media(max-width:520px){ header { padding:0 16px; } nav { gap:12px; } .hero { padding-top:60px; } .page-heading { align-items:start; gap:20px; } }

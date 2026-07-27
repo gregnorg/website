@@ -2,11 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
-  const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const signup = mode === "signup";
@@ -15,16 +13,26 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const data = new FormData(event.currentTarget);
-    const email = String(data.get("email"));
-    const password = String(data.get("password"));
-    const result = signup
-      ? await authClient.signUp.email({ email, password, name: String(data.get("username")), username: String(data.get("username")) })
-      : await authClient.signIn.email({ email, password });
-    setBusy(false);
-    if (result.error) return setError(result.error.message || "Something went wrong.");
-    router.push("/games");
-    router.refresh();
+    try {
+      const data = new FormData(event.currentTarget);
+      const email = String(data.get("email"));
+      const password = String(data.get("password"));
+      const result = signup
+        ? await authClient.signUp.email({ email, password, name: String(data.get("username")), username: String(data.get("username")) })
+        : await authClient.signIn.email({ email, password });
+      if (result.error) {
+        setError(result.error.message || "Something went wrong.");
+        return;
+      }
+
+      // Use a full navigation so the protected server page receives the newly
+      // issued session cookie on its first request.
+      window.location.assign("/games");
+    } catch {
+      setError("The authentication service is unavailable. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
