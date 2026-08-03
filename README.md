@@ -70,16 +70,13 @@ forwards `http://localhost:3000` to WSL automatically.
 
 To make the site available to other devices on the same network:
 
-1. Set `BETTER_AUTH_URL` in `.env.local` to the Windows machine's LAN URL,
-   for example `http://192.168.1.50:3000`.
-2. Allow inbound TCP port 3000 in Windows Defender Firewall.
-3. If your WSL version does not use mirrored networking, create a Windows
+1. Allow inbound TCP port 3000 in Windows Defender Firewall.
+2. If your WSL version does not use mirrored networking, create a Windows
    port proxy from port 3000 to the current WSL IP. The WSL IP can change
    after a restart, so the proxy may need to be updated.
 
 Do not expose the development server directly to the public internet. For
-internet hosting, put the production server behind HTTPS and a reverse proxy,
-and set `BETTER_AUTH_URL` to the HTTPS address.
+internet hosting, put the production server behind HTTPS and a reverse proxy.
 
 ## Commands
 
