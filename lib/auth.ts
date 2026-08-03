@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { username } from "better-auth/plugins";
 import { hostname, networkInterfaces } from "node:os";
 import { pool } from "@/lib/db";
 
@@ -21,16 +22,18 @@ for (const addresses of Object.values(networkInterfaces())) {
 export const auth = betterAuth({
   baseURL: {
     allowedHosts: [...localHosts],
-    protocol: "auto",
+    // This server is accessed directly over HTTP on the local network.
+    // Change this to "https" when an HTTPS reverse proxy is added.
+    protocol: "http",
   },
   database: pool,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
   },
-  user: {
-    additionalFields: {
-      username: { type: "string", required: true, unique: true },
-    },
-  },
+  plugins: [username({
+    minUsernameLength: 3,
+    maxUsernameLength: 24,
+    usernameNormalization: false,
+  })],
 });
