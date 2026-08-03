@@ -34,13 +34,13 @@ export default async function GamesPage() {
       {result.rows.length ? (
         <div className="game-list">
           {result.rows.map((game) => (
-            <article className="game-card" key={game.id}>
+            <Link className="game-card" href={`/games/${game.id}`} key={game.id}>
               <div>
                 <h2>vs. {game.opponent_username}</h2>
                 <p>Updated {game.updated_at.toLocaleString()}</p>
               </div>
               <span className="status">{game.status}</span>
-            </article>
+            </Link>
           ))}
         </div>
       ) : (
