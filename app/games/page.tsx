@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import { gameStatusLabel } from "@/lib/game";
 
 export default async function GamesPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -10,10 +11,12 @@ export default async function GamesPage() {
   const result = await pool.query<{
     id: string;
     status: string;
+    winner_id: string | null;
     opponent_username: string;
     updated_at: Date;
   }>(
-    `SELECT g.id, g.status, opponent.username AS opponent_username, g.updated_at
+    `SELECT g.id, g.status, g.winner_id,
+            opponent.username AS opponent_username, g.updated_at
        FROM games g
        JOIN game_players me
          ON me.game_id = g.id AND me.user_id = $1
@@ -39,7 +42,9 @@ export default async function GamesPage() {
                 <h2>vs. {game.opponent_username}</h2>
                 <p>Updated {game.updated_at.toLocaleString()}</p>
               </div>
-              <span className="status">{game.status}</span>
+              <span className="status">
+                {gameStatusLabel(game.status, game.winner_id, session.user.id)}
+              </span>
             </Link>
           ))}
         </div>

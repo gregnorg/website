@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EMPTY_BOARD, currentMark, isDraw, play, winner } from "../lib/game.ts";
+import {
+  EMPTY_BOARD,
+  currentMark,
+  gameStatusLabel,
+  isDraw,
+  play,
+  winner,
+} from "../lib/game.ts";
 
 test("players alternate turns", () => {
   const afterX = play(EMPTY_BOARD, 0, "X");
@@ -21,4 +28,10 @@ test("detects a draw", () => {
 test("rejects occupied squares", () => {
   const board = play(EMPTY_BOARD, 4, "X");
   assert.throws(() => play(board, 4, "O"), /occupied/);
+});
+
+test("shows completed game status from the player's perspective", () => {
+  assert.equal(gameStatusLabel("won", "player-1", "player-1"), "won");
+  assert.equal(gameStatusLabel("won", "player-1", "player-2"), "lost");
+  assert.equal(gameStatusLabel("draw", null, "player-1"), "draw");
 });

@@ -4,6 +4,15 @@ export type Board = [Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell];
 
 export const EMPTY_BOARD: Board = [null, null, null, null, null, null, null, null, null];
 
+export function gameStatusLabel(
+  status: string,
+  winnerId: string | null,
+  playerId: string,
+): string {
+  if (status !== "won") return status;
+  return winnerId === playerId ? "won" : "lost";
+}
+
 const LINES = [
   [0, 1, 2], [3, 4, 5], [6, 7, 8],
   [0, 3, 6], [1, 4, 7], [2, 5, 8],
