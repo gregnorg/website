@@ -85,3 +85,12 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - `npm run lint` — lint checks
 - `npm run build` — production build
 - `npm start` — production server on all network interfaces
+
+## Top-level scripts
+
+- `scripts/apply-migration.js` — helper for applying DB schema migrations from `.env.local`
+- `scripts/purge_games.sql` — SQL to delete game-related rows
+- `scripts/purge_games.sh` — wrapper to run `purge_games.sql` using `psql`
+- `scripts/purge_all_games.sql` — SQL to delete all games, game_players, and moves while preserving user accounts
+- `scripts/purge_all_games.sh` — wrapper to run `purge_all_games.sql` using `psql`
+- `scripts/purge_all_games_envlocal.sh` — wrapper that sources `.env.local` and runs `scripts/purge_all_games.sh`

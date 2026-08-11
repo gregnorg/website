@@ -1,0 +1,20 @@
+                                                            Table "public.games"
+   Column   |           Type           | Collation | Nullable |        Default         | Storage  | Compression | Stats target | Description 
+------------+--------------------------+-----------+----------+------------------------+----------+-------------+--------------+-------------
+ id         | uuid                     |           | not null | gen_random_uuid()      | plain    |             |              | 
+ created_by | text                     |           | not null |                        | extended |             |              | 
+ status     | game_status              |           | not null | 'waiting'::game_status | plain    |             |              | 
+ winner_id  | text                     |           |          |                        | extended |             |              | 
+ created_at | timestamp with time zone |           | not null | now()                  | plain    |             |              | 
+ updated_at | timestamp with time zone |           | not null | now()                  | plain    |             |              | 
+Indexes:
+    "games_pkey" PRIMARY KEY, btree (id)
+    "games_created_by_idx" btree (created_by)
+Foreign-key constraints:
+    "games_created_by_fkey" FOREIGN KEY (created_by) REFERENCES "user"(id)
+    "games_winner_id_fkey" FOREIGN KEY (winner_id) REFERENCES "user"(id)
+Referenced by:
+    TABLE "game_players" CONSTRAINT "game_players_game_id_fkey" FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+    TABLE "moves" CONSTRAINT "moves_game_id_fkey" FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+Access method: heap
+

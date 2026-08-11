@@ -10,6 +10,10 @@ export async function createGame(formData: FormData) {
   if (!session) redirect("/login");
 
   const username = String(formData.get("username") ?? "").trim();
+  const gameType = String(formData.get("game_type") ?? "tic_tac_toe").trim();
+  if (!["tic_tac_toe", "pushfight"].includes(gameType)) {
+    redirect("/games/new?error=Invalid+game+type.");
+  }
   if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) {
     redirect("/games/new?error=Enter+a+valid+username.");
   }
@@ -32,10 +36,10 @@ export async function createGame(formData: FormData) {
   try {
     await client.query("BEGIN");
     const game = await client.query<{ id: string }>(
-      `INSERT INTO games (created_by, status)
-       VALUES ($1, 'active')
+      `INSERT INTO games (created_by, status, game_type)
+       VALUES ($1, 'active', $2)
        RETURNING id`,
-      [session.user.id],
+      [session.user.id, gameType],
     );
     await client.query(
       `INSERT INTO game_players (game_id, user_id, mark)

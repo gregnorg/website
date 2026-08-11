@@ -3,10 +3,13 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TYPE game_status AS ENUM ('waiting', 'active', 'won', 'draw', 'cancelled');
 CREATE TYPE player_mark AS ENUM ('X', 'O');
 
+CREATE TYPE game_type AS ENUM ('tic_tac_toe', 'pushfight');
+
 CREATE TABLE games (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_by TEXT NOT NULL REFERENCES "user"(id),
   status game_status NOT NULL DEFAULT 'waiting',
+  game_type game_type NOT NULL DEFAULT 'tic_tac_toe',
   winner_id TEXT REFERENCES "user"(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -25,8 +28,9 @@ CREATE TABLE moves (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   player_id TEXT NOT NULL REFERENCES "user"(id),
-  position SMALLINT NOT NULL CHECK (position BETWEEN 0 AND 8),
-  move_number SMALLINT NOT NULL CHECK (move_number BETWEEN 1 AND 9),
+  position SMALLINT,
+  move_number SMALLINT NOT NULL,
+  payload JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (game_id, position),
   UNIQUE (game_id, move_number)

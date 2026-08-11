@@ -15,10 +15,17 @@ export default async function NewGamePage({
 
   return (
     <section className="panel">
-      <p className="kicker">Tic-tac-toe</p>
-      <h1>New game</h1>
-      <p>Enter the username of the person you want to play.</p>
+      <p className="kicker">New game</p>
+      <h1>Create a match</h1>
+      <p>Choose a game and enter the username of the person you want to play.</p>
       <form action={createGame}>
+        <label>
+          Game
+          <select name="game_type" defaultValue="tic_tac_toe">
+            <option value="tic_tac_toe">Tic-tac-toe</option>
+            <option value="pushfight">Pushfight</option>
+          </select>
+        </label>
         <label>
           Opponent username
           <input
