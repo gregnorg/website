@@ -27,9 +27,12 @@ export type SetupPayload = {
 };
 
 export type Direction = "up" | "down" | "left" | "right";
-export type MovePayload =
+export type TurnAction =
   | { type: "move"; from: Coord; to: Coord }
-  | { type: "push"; index: Coord; dir: Direction }
+  | { type: "push"; index: Coord; dir: Direction };
+export type MovePayload =
+  | TurnAction
+  | { type: "turn"; actions: TurnAction[] }
   | SetupPayload;
 
 export type LegacyMovePayload =
@@ -67,11 +70,15 @@ export function normalizeMovePayload(payload: unknown): MovePayload {
 
   if (typed.type === "push") {
     const pushPayload = payload as LegacyMovePayload | MovePayload;
+    const direction = (pushPayload as any).dir;
+    if (!["up", "down", "left", "right"].includes(direction)) {
+      throw new Error("Invalid push direction.");
+    }
     if (typeof (pushPayload as any).index === "number") {
       return {
         type: "push",
         index: indexToCoord((pushPayload as any).index),
-        dir: (pushPayload as any).dir,
+        dir: direction,
       };
     }
     if (
@@ -79,7 +86,7 @@ export function normalizeMovePayload(payload: unknown): MovePayload {
       typeof (pushPayload as any).index?.row === "number" &&
       typeof (pushPayload as any).index?.col === "number"
     ) {
-      return pushPayload as MovePayload;
+      return { type: "push", index: (pushPayload as any).index, dir: direction };
     }
     throw new Error("Invalid push payload.");
   }
@@ -106,6 +113,22 @@ export function normalizeMovePayload(payload: unknown): MovePayload {
       throw new Error("Invalid setup piece.");
     });
     return { type: "setup", pieces: normalizedPieces };
+  }
+
+  if (typed.type === "turn") {
+    const actions = (payload as any).actions;
+    if (!Array.isArray(actions) || actions.length < 1 || actions.length > 3) {
+      throw new Error("A turn must contain a push and no more than two moves.");
+    }
+    const normalizedActions = actions.map((action) => normalizeMovePayload(action));
+    if (normalizedActions.some((action) => action.type !== "move" && action.type !== "push")) {
+      throw new Error("A turn can only contain moves and a push.");
+    }
+    const pushIndex = normalizedActions.findIndex((action) => action.type === "push");
+    if (pushIndex !== normalizedActions.length - 1) {
+      throw new Error("A turn must end with exactly one push.");
+    }
+    return { type: "turn", actions: normalizedActions as TurnAction[] };
   }
 
   throw new Error("Invalid action type.");
@@ -164,11 +187,28 @@ function isAnchorCell(cell: PushfightCell) {
   return cell === "white-pusher-anchor" || cell === "black-pusher-anchor";
 }
 
+function withoutAnchor(cell: PushfightCell): PushfightCell {
+  if (cell === "white-pusher-anchor") return "white-pusher";
+  if (cell === "black-pusher-anchor") return "black-pusher";
+  return cell;
+}
+
 function isOccupiedCell(cell: PushfightCell) {
   return cell !== "empty" && cell !== "invalid";
 }
 
-export function applyMove(board: Board, payload: MovePayload, playerColor: "white" | "black"): { board: Board; winner?: string } {
+export function applyMove(board: Board, payload: MovePayload, playerColor: "white" | "black"): { board: Board; winner?: "white" | "black" } {
+  if (payload.type === "turn") {
+    let current = board;
+    let winner: "white" | "black" | undefined;
+    for (const action of payload.actions) {
+      const result = applyMove(current, action, playerColor);
+      current = result.board;
+      winner = result.winner ?? winner;
+    }
+    return { board: current, winner };
+  }
+
   const next = board.map((row) => row.slice()) as Board;
 
   if (payload.type === "move") {
@@ -222,23 +262,31 @@ export function applyMove(board: Board, payload: MovePayload, playerColor: "whit
 
     const line: Coord[] = [];
     let current: Coord | null = first;
+    let offBoard = false;
     while (current) {
       const currentCell = next[current.row][current.col];
-      if (currentCell === "invalid") throw new Error("Line contains invalid cell");
+      if (currentCell === "invalid") {
+        offBoard = true;
+        break;
+      }
       if (!isOccupiedCell(currentCell)) break;
       if (isAnchorCell(currentCell)) throw new Error("Line contains anchor");
       line.push(current);
       current = neighbor(current, dir);
     }
 
-    const offBoard = current === null;
+    offBoard ||= current === null;
     const lastPos = line[line.length - 1];
     const lastPiece = next[lastPos.row][lastPos.col];
+
+    if (offBoard && (dir === "up" || dir === "down")) {
+      throw new Error("Cannot push a piece through the siderail");
+    }
 
     for (let i = line.length - 1; i >= 0; i -= 1) {
       const fromPos = line[i];
       const toPos = neighbor(fromPos, dir);
-      if (!toPos) {
+      if (!toPos || next[toPos.row][toPos.col] === "invalid") {
         next[fromPos.row][fromPos.col] = "empty";
         continue;
       }
@@ -246,10 +294,16 @@ export function applyMove(board: Board, payload: MovePayload, playerColor: "whit
       next[fromPos.row][fromPos.col] = "empty";
     }
 
-    next[index.row][index.col] = playerColor === "white" ? "white-pusher-anchor" : "black-pusher-anchor";
+    for (let row = 0; row < next.length; row += 1) {
+      for (let col = 0; col < next[row].length; col += 1) {
+        next[row][col] = withoutAnchor(next[row][col]);
+      }
+    }
+    next[index.row][index.col] = "empty";
+    next[first.row][first.col] = playerColor === "white" ? "white-pusher-anchor" : "black-pusher-anchor";
 
-    if (offBoard && lastPiece !== "empty" && lastPiece !== "invalid" && cellColor(lastPiece) !== playerColor) {
-      return { board: next, winner: playerColor };
+    if (offBoard && lastPiece !== "empty" && lastPiece !== "invalid") {
+      return { board: next, winner: cellColor(lastPiece) === "white" ? "black" : "white" };
     }
     return { board: next };
   }
@@ -269,6 +323,9 @@ export function applyMove(board: Board, payload: MovePayload, playerColor: "whit
       }
       if (!inBounds({ row: piece.row, col: piece.col }) || !isValidCoord({ row: piece.row, col: piece.col })) {
         throw new Error("Setup pieces must be placed on valid board cells.");
+      }
+      if ((playerColor === "white" && piece.col > 3) || (playerColor === "black" && piece.col < 4)) {
+        throw new Error(`${playerColor === "white" ? "White" : "Black"} setup pieces are outside their setup zone.`);
       }
       const key = `${piece.row},${piece.col}`;
       if (seen.has(key)) throw new Error("Setup pieces must occupy distinct cells.");
@@ -300,7 +357,7 @@ export function movesSinceLastPush(moves: { payload: MovePayload | null }[]) {
   for (let i = moves.length - 1; i >= 0; i -= 1) {
     const payload = moves[i].payload;
     if (!payload) continue;
-    if (payload.type === "push") break;
+    if (payload.type === "push" || payload.type === "turn") break;
     if (payload.type === "move") count += 1;
   }
   return count;

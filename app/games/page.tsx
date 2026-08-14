@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { gameStatusLabel } from "@/lib/game";
 
+export const dynamic = "force-dynamic";
+
 export default async function GamesPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");

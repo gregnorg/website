@@ -8,6 +8,8 @@ import { makeMove } from "./actions";
 import PushfightBoard from "@/components/pushfight-board";
 import { applyMove, emptyBoard, movesSinceLastPush } from "@/lib/pushfight";
 
+export const dynamic = "force-dynamic";
+
 export default async function GamePage({
   params,
   searchParams,
@@ -67,7 +69,7 @@ export default async function GamePage({
     }
     let lastPushBy: string | null = null;
     for (const move of moves.rows) {
-      if (move.payload?.type === "push") lastPushBy = move.player_id;
+      if (move.payload?.type === "push" || move.payload?.type === "turn") lastPushBy = move.player_id;
     }
     return lastPushBy === null ? xPlayerId : (lastPushBy === xPlayerId ? oPlayerId : xPlayerId);
   })();
@@ -98,10 +100,10 @@ export default async function GamePage({
     <section className="game-page">
       <Link className="back-link" href="/games">← All games</Link>
       <h1>vs. {game.opponent_username}</h1>
-      <p className="game-summary">{summary}</p>
-      {error && <p className="error game-error" role="alert">{error}</p>}
       {game.game_type === "tic_tac_toe" ? (
         <>
+          <p className="game-summary">{summary}</p>
+          {error && <p className="error game-error" role="alert">{error}</p>}
           <p className="kicker">Tic-tac-toe</p>
           <div className="game-board" aria-label="Tic-tac-toe board">
             {board.map((cell, position) => (
@@ -124,12 +126,14 @@ export default async function GamePage({
         <>
           <p className="kicker">Pushfight (simplified)</p>
           <PushfightBoard
+            key={moves.rows.length}
             board={(() => {
-              const pfBoard = emptyBoard();
+              let pfBoard = emptyBoard();
               for (const move of moves.rows) {
                 if (!move.payload) continue;
                 try {
-                  applyMove(pfBoard, move.payload, move.player_id);
+                  const moverColor = move.player_id === xPlayerId ? "white" : "black";
+                  pfBoard = applyMove(pfBoard, move.payload, moverColor).board;
                 } catch {
                   // ignore invalid historical moves for display
                 }
@@ -147,10 +151,12 @@ export default async function GamePage({
             isSetupPhase={setupStage}
             setupTeam={setupMoves.length === 0 ? "white" : "black"}
             setupTurnPlayerId={setupStage ? currentPlayerId : ""}
+            statusMessage={summary}
+            errorMessage={error}
+            gameOutcome={game.status === "won" ? (game.winner_id === session.user.id ? "win" : "loss") : null}
           />
         </>
       )}
     </section>
   );
 }
-

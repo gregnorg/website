@@ -113,25 +113,30 @@ export async function makeMove(formData: FormData) {
     const playerColor = session.user.id === playerX ? "white" : "black";
 
     // reconstruct board from initial setup and applied payloads
-    const pfBoard = pfInitialBoard();
+    let pfBoard = pfInitialBoard();
     for (const mv of moves.rows) {
       if (!mv.payload) continue;
       try {
         const normalizedPayload = normalizeMovePayload(mv.payload);
         const moverColor = mv.player_id === playerX ? "white" : "black";
-        applyMove(pfBoard, normalizedPayload, moverColor);
+        pfBoard = applyMove(pfBoard, normalizedPayload, moverColor).board;
       } catch (err) {
         // malformed historical move — treat as error
         message = "Corrupt game history.";
       }
     }
 
-    // whose turn? find last push
+    const setupMoves = moves.rows.filter((mv) => mv.payload?.type === "setup");
+    const setupStage = setupMoves.length < 2;
+
+    // During setup white places first, then black. Afterwards a push ends the turn.
     let lastPushBy: string | null = null;
     for (const mv of moves.rows) {
-      if (mv.payload && mv.payload.type === "push") lastPushBy = mv.player_id;
+      if (mv.payload && (mv.payload.type === "push" || mv.payload.type === "turn")) lastPushBy = mv.player_id;
     }
-    const expectedPlayer = lastPushBy === null ? playerX : (lastPushBy === playerX ? playerO : playerX);
+    const expectedPlayer = setupStage
+      ? (setupMoves.length === 0 ? playerX : playerO)
+      : lastPushBy === null ? playerX : (lastPushBy === playerX ? playerO : playerX);
     if (!message && session.user.id !== expectedPlayer) message = "It is not your turn.";
 
     let actionPayload: MovePayload | null = null;
@@ -153,14 +158,26 @@ export async function makeMove(formData: FormData) {
         message = "Action type and payload type must match.";
       }
 
-      if (!message && actionType !== "move" && actionType !== "push" && actionType !== "setup") {
+      if (!message && actionType !== "move" && actionType !== "push" && actionType !== "turn" && actionType !== "setup") {
         message = "Invalid action type.";
+      }
+      if (!message && setupStage && actionType !== "setup") {
+        message = "Both players must finish setup before moving.";
+      }
+      if (!message && !setupStage && actionType !== "turn") {
+        message = "Submit the complete turn, ending with a push.";
       }
     }
 
     const movesThisTurn = movesSinceLastPush(moves.rows);
     if (!message && actionPayload?.type === "move" && movesThisTurn >= 2) {
       message = "You can only make up to two moves before pushing.";
+    }
+    if (!message && actionPayload?.type === "turn") {
+      const stagedMoves = actionPayload.actions.filter((action) => action.type === "move").length;
+      if (movesThisTurn + stagedMoves > 2) {
+        message = "You can only make up to two moves before pushing.";
+      }
     }
 
     if (message || !actionPayload) {
@@ -176,7 +193,7 @@ export async function makeMove(formData: FormData) {
         if (result.winner) {
           await client.query(
             `UPDATE games SET status = 'won', winner_id = $2, updated_at = now() WHERE id = $1`,
-            [gameId, result.winner],
+            [gameId, result.winner === "white" ? playerX : playerO],
           );
         } else {
           await client.query("UPDATE games SET updated_at = now() WHERE id = $1", [gameId]);

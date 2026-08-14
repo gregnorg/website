@@ -10,7 +10,7 @@ export async function createGame(formData: FormData) {
   if (!session) redirect("/login");
 
   const username = String(formData.get("username") ?? "").trim();
-  const gameType = String(formData.get("game_type") ?? "tic_tac_toe").trim();
+  const gameType = String(formData.get("game_type") ?? "pushfight").trim();
   if (!["tic_tac_toe", "pushfight"].includes(gameType)) {
     redirect("/games/new?error=Invalid+game+type.");
   }

@@ -2,6 +2,9 @@ node_modules/
 .next/
 .env*
 !.env.example
+dump.sql
+dump.sql~
+dump.test
 # Local secrets and setup-script backups (also covered by .env* above).
 .env.local
 .env.local.backup*

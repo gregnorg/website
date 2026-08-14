@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { Board as PushfightBoardType, Coord, PushfightCell } from "@/lib/pushfight";
-import { isValidCoord } from "@/lib/pushfight";
+import { useState } from "react";
+import type { Board, Coord, PushfightCell, MovePayload, TurnAction } from "@/lib/pushfight";
+import { applyMove, isValidCoord } from "@/lib/pushfight";
 
 type Props = {
-  board: PushfightBoardType;
+  board: Board;
   gameId: string;
   myId: string;
   currentPlayerId: string;
@@ -17,28 +17,22 @@ type Props = {
   isSetupPhase: boolean;
   setupTeam: "white" | "black";
   setupTurnPlayerId: string;
+  statusMessage: string;
+  errorMessage?: string;
+  gameOutcome: "win" | "loss" | null;
 };
+
+type LegalTarget = { coord: Coord; action: TurnAction; board: Board; winner?: "white" | "black" };
 
 function coordEquals(a: Coord, b: Coord) {
   return a.row === b.row && a.col === b.col;
 }
 
-function isNeighbor(a: Coord, b: Coord) {
-  return (
-    (a.col === b.col && Math.abs(a.row - b.row) === 1) ||
-    (a.row === b.row && Math.abs(a.col - b.col) === 1)
-  );
-}
-
 function directionFrom(a: Coord, b: Coord): "up" | "down" | "left" | "right" | null {
-  if (a.col === b.col) {
-    if (b.row === a.row - 1) return "up";
-    if (b.row === a.row + 1) return "down";
-  }
-  if (a.row === b.row) {
-    if (b.col === a.col - 1) return "left";
-    if (b.col === a.col + 1) return "right";
-  }
+  if (a.col === b.col && b.row === a.row - 1) return "up";
+  if (a.col === b.col && b.row === a.row + 1) return "down";
+  if (a.row === b.row && b.col === a.col - 1) return "left";
+  if (a.row === b.row && b.col === a.col + 1) return "right";
   return null;
 }
 
@@ -53,7 +47,7 @@ function isAnchorCell(cell: PushfightCell) {
 }
 
 function isPusherCell(cell: PushfightCell) {
-  return cell === "white-pusher" || cell === "black-pusher" || cell === "white-pusher-anchor" || cell === "black-pusher-anchor";
+  return cell === "white-pusher" || cell === "black-pusher";
 }
 
 function isPieceCell(cell: PushfightCell) {
@@ -91,197 +85,181 @@ export default function PushfightBoard({
   myId,
   currentPlayerId,
   whitePlayerId,
-  blackPlayerId,
   canMove,
   movesThisTurn,
   action,
   isSetupPhase,
   setupTeam,
-  setupTurnPlayerId,
+  statusMessage,
+  errorMessage,
+  gameOutcome,
 }: Props) {
-  const [from, setFrom] = useState<Coord | null>(null);
-  const [to, setTo] = useState<Coord | null>(null);
+  const [selectedPiece, setSelectedPiece] = useState<Coord | null>(null);
   const [setupSelection, setSetupSelection] = useState<Coord[]>([]);
+  const [stagedBoard, setStagedBoard] = useState<Board>(board);
+  const [stagedActions, setStagedActions] = useState<TurnAction[]>([]);
+  const [stagedWinner, setStagedWinner] = useState<"white" | "black" | null>(null);
 
   const myColor = myId === whitePlayerId ? "white" : "black";
   const isSetupTurn = isSetupPhase && currentPlayerId === myId;
-  const setupPieces = setupSelection.map((coord, idx) => ({ row: coord.row, col: coord.col, kind: setupPieceKind(idx) }));
+  const setupPieces = setupSelection.map((coord, idx) => ({ ...coord, kind: setupPieceKind(idx) }));
   const remainingPushers = 3 - Math.min(setupSelection.length, 3);
   const remainingNonpushers = Math.max(0, 2 - Math.max(0, setupSelection.length - 3));
   const canSubmitSetup = isSetupPhase && setupSelection.length === 5 && isSetupTurn;
+  const stagedMoveCount = stagedActions.filter((item) => item.type === "move").length;
+  const turnComplete = stagedActions.at(-1)?.type === "push";
+  const movesRemaining = Math.max(0, 2 - movesThisTurn - stagedMoveCount);
 
-  const previewBoard = board.map((row, rowIndex) =>
-    row.map((cell, colIndex) => {
-      const selectionIndex = setupSelection.findIndex((coord) => coordEquals(coord, { row: rowIndex, col: colIndex }));
-      if (isSetupPhase && selectionIndex !== -1 && cell === "empty") {
-        return buildPreviewPiece(myColor, selectionIndex);
+  const displayedBoard = isSetupPhase
+    ? board.map((row, rowIndex) => row.map((cell, colIndex) => {
+        const index = setupSelection.findIndex((coord) => coordEquals(coord, { row: rowIndex, col: colIndex }));
+        return index !== -1 && cell === "empty" ? buildPreviewPiece(myColor, index) : cell;
+      }))
+    : stagedBoard;
+
+  const legalTargets: LegalTarget[] = [];
+  if (!isSetupPhase && selectedPiece && !turnComplete) {
+    const selectedCell = stagedBoard[selectedPiece.row][selectedPiece.col];
+    for (let row = 0; row < stagedBoard.length; row += 1) {
+      for (let col = 0; col < stagedBoard[row].length; col += 1) {
+        const coord = { row, col };
+        if (!isValidCoord(coord)) continue;
+        const destination = stagedBoard[row][col];
+        let candidate: TurnAction | null = null;
+        if (destination === "empty" && movesRemaining > 0) {
+          candidate = { type: "move", from: selectedPiece, to: coord };
+        } else if (isPieceCell(destination) && isPusherCell(selectedCell)) {
+          const dir = directionFrom(selectedPiece, coord);
+          if (dir) candidate = { type: "push", index: selectedPiece, dir };
+        }
+        if (!candidate) continue;
+        try {
+          const result = applyMove(stagedBoard, candidate, myColor);
+          legalTargets.push({ coord, action: candidate, board: result.board, winner: result.winner });
+        } catch {
+          // Not a legal destination from the current staged position.
+        }
       }
-      return cell;
-    }),
-  );
-
-  const targetCell = to ? previewBoard[to.row][to.col] : "empty";
-  const actionType = isSetupPhase ? "setup" : from && to ? (targetCell !== "empty" ? "push" : "move") : "";
-  const actionDir = !isSetupPhase && actionType === "push" && from && to ? directionFrom(from, to) : null;
-  const canSubmit = !isSetupPhase && from && to && (actionType === "move" || (actionType === "push" && actionDir));
-  const isSelectionReady = isSetupPhase ? setupSelection.length === 5 : Boolean(from && to);
-
-  const selectedDescription = useMemo(() => {
-    if (isSetupPhase) {
-      if (!isSetupTurn) return `Waiting for the ${setupTeam} team to finish setup.`;
-      if (setupSelection.length < 5) {
-        return `Select ${remainingPushers} pusher${remainingPushers === 1 ? "" : "s"} and ${remainingNonpushers} non-pusher${remainingNonpushers === 1 ? "" : "s"}.`;
-      }
-      return "Ready to submit setup.";
     }
+  }
 
-    if (!from) return "Choose one of your pieces.";
-    if (!to) return "Click an empty square to move or a neighboring square piece to push.";
-    return targetCell !== "empty" ? "Ready to push — click submit to finish your turn." : "Ready to move — click submit to finish your turn.";
-  }, [from, to, targetCell, isSetupPhase, isSetupTurn, setupSelection.length, remainingPushers, remainingNonpushers, setupTeam]);
+  const actionPayload: MovePayload | null = isSetupPhase
+    ? { type: "setup", pieces: setupPieces }
+    : turnComplete ? { type: "turn", actions: stagedActions } : null;
 
-  const resetSelection = () => {
-    setFrom(null);
-    setTo(null);
+  const resetTurn = () => {
+    setSelectedPiece(null);
     setSetupSelection([]);
+    setStagedBoard(board);
+    setStagedActions([]);
+    setStagedWinner(null);
   };
 
   const handleCellClick = (row: number, col: number) => {
     if (!canMove || !isValidCoord({ row, col })) return;
-    const selectedCell = board[row][col];
     const coord = { row, col };
 
     if (isSetupPhase) {
-      if (!isSetupTurn) return;
-      if (selectedCell !== "empty") return;
-      setFrom(null);
-      setTo(null);
+      if (!isSetupTurn || board[row][col] !== "empty") return;
       setSetupSelection((current) => {
-        const exists = current.find((item) => coordEquals(item, coord));
-        if (exists) {
-          return current.filter((item) => !coordEquals(item, coord));
-        }
-        if (current.length >= 5) return current;
-        return [...current, coord];
+        const exists = current.some((item) => coordEquals(item, coord));
+        if (exists) return current.filter((item) => !coordEquals(item, coord));
+        return current.length < 5 ? [...current, coord] : current;
       });
       return;
     }
 
-    if (!from) {
-      if (isPieceCell(selectedCell) && !isAnchorCell(selectedCell) && cellColor(selectedCell) === myColor) {
-        setFrom(coord);
-      }
+    if (turnComplete) return;
+    const target = legalTargets.find((item) => coordEquals(item.coord, coord));
+    if (target) {
+      setStagedBoard(target.board);
+      setStagedActions((current) => [...current, target.action]);
+      setStagedWinner(target.winner ?? null);
+      setSelectedPiece(null);
       return;
     }
 
-    if (coordEquals(coord, from)) {
-      resetSelection();
-      return;
-    }
-
-    if (selectedCell === "empty") {
-      setTo(coord);
-      return;
-    }
-
-    const fromCell = board[from.row][from.col];
-    if (
-      isPieceCell(selectedCell) &&
-      !isAnchorCell(selectedCell) &&
-      cellColor(selectedCell) !== myColor &&
-      isPusherCell(fromCell) &&
-      isNeighbor(from, coord)
-    ) {
-      setTo(coord);
-      return;
-    }
-
-    if (isPieceCell(selectedCell) && !isAnchorCell(selectedCell) && cellColor(selectedCell) === myColor) {
-      setFrom(coord);
-      setTo(null);
+    const cell = stagedBoard[row][col];
+    if (isPieceCell(cell) && !isAnchorCell(cell) && cellColor(cell) === myColor) {
+      setSelectedPiece(coordEquals(selectedPiece ?? { row: -1, col: -1 }, coord) ? null : coord);
+    } else {
+      setSelectedPiece(null);
     }
   };
 
-  const actionPayload = isSetupPhase
-    ? { type: "setup", pieces: setupPieces }
-    : from && to
-    ? targetCell !== "empty" && actionDir
-      ? { type: "push", index: from, dir: actionDir }
-      : { type: "move", from, to }
-    : null;
+  const selectedDescription = isSetupPhase
+    ? !isSetupTurn
+      ? `Waiting for the ${setupTeam} team to finish setup.`
+      : setupSelection.length < 5
+        ? `Select ${remainingPushers} pusher${remainingPushers === 1 ? "" : "s"} and ${remainingNonpushers} non-pusher${remainingNonpushers === 1 ? "" : "s"}.`
+        : "Ready to submit setup."
+    : turnComplete
+      ? "Turn ready — submit it or reset the board."
+      : selectedPiece
+        ? "Choose one of the dotted legal destinations."
+        : `Choose a piece. ${movesRemaining} optional move${movesRemaining === 1 ? "" : "s"} remaining; your turn must end with a push.`;
 
   const columnLabels = ["A", "B", "C", "D", "E", "F", "G", "H"];
   const rowLabels = ["1", "2", "3", "4"];
+  const displayedOutcome = stagedWinner ? (stagedWinner === myColor ? "win" : "loss") : gameOutcome;
 
   return (
     <div className="pushfight-wrapper">
-      <div className="pushfight-meta">
-        <p>{currentPlayerId === myId ? "Your turn" : "Waiting for opponent"}</p>
-        {!isSetupPhase && <p>Moves this turn: {movesThisTurn} / 2</p>}
-        <p className={isSelectionReady ? "ready-description" : undefined}>{selectedDescription}</p>
-        {isSetupPhase && <p className="setup-hint">First 3 pieces are pushers; last 2 are non-pushers.</p>}
-      </div>
       <div className="pf-board" aria-label="Pushfight board">
-        <div className="pf-axis-labels pf-column-labels top">
-          {columnLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
-        <div className="pf-axis-labels pf-column-labels bottom">
-          {columnLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
-        <div className="pf-axis-labels pf-row-labels left">
-          {rowLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
-        <div className="pf-axis-labels pf-row-labels right">
-          {rowLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
-        {previewBoard.map((row, rowIndex) =>
-          row.map((cell, colIndex) => {
-            const valid = isValidCoord({ row: rowIndex, col: colIndex });
-            const selected = isSetupPhase
-              ? setupSelection.some((coord) => coordEquals(coord, { row: rowIndex, col: colIndex }))
-              : from && coordEquals(from, { row: rowIndex, col: colIndex }) || to && coordEquals(to, { row: rowIndex, col: colIndex });
-            const isPreview = isSetupPhase && setupSelection.some((coord) => coordEquals(coord, { row: rowIndex, col: colIndex })) && board[rowIndex][colIndex] === "empty";
-            const isMyPiece = isPieceCell(cell) && cellColor(cell) === myColor;
-            const isOpponentPiece = isPieceCell(cell) && cellColor(cell) !== myColor;
-            const isAnchor = isAnchorCell(cell);
-            const isTarget = !isSetupPhase && from && !to && previewBoard[rowIndex][colIndex] === "empty";
-
-            if (!valid) {
-              return <div key={`${rowIndex}-${colIndex}`} className="pf-cell pf-hole" />;
-            }
-
-            return (
-              <button
-                key={`${rowIndex}-${colIndex}`}
-                type="button"
-                className={`pf-cell${selected ? " selected" : ""}${isPreview ? " preview" : ""}${isMyPiece ? " mine" : ""}${isOpponentPiece ? " theirs" : ""}${isAnchor ? " anchor" : ""}`}
-                onClick={() => handleCellClick(rowIndex, colIndex)}
-                aria-label={cell !== "empty" ? pieceLabel(cell) : `Empty cell ${rowIndex + 1}, ${colIndex + 1}`}
-              >
-                {cell !== "empty" ? <span className={pieceClass(cell)} /> : null}
-              </button>
-            );
-          }),
+        <div className="pf-axis-labels pf-column-labels top">{columnLabels.map((label) => <span key={label}>{label}</span>)}</div>
+        <div className="pf-axis-labels pf-column-labels bottom">{columnLabels.map((label) => <span key={label}>{label}</span>)}</div>
+        <div className="pf-axis-labels pf-row-labels left">{rowLabels.map((label) => <span key={label}>{label}</span>)}</div>
+        <div className="pf-axis-labels pf-row-labels right">{rowLabels.map((label) => <span key={label}>{label}</span>)}</div>
+        {displayedBoard.map((row, rowIndex) => row.map((cell, colIndex) => {
+          const coord = { row: rowIndex, col: colIndex };
+          const valid = isValidCoord(coord);
+          const setupBlocked = isSetupPhase && valid && (setupTeam === "white" ? colIndex >= 4 : colIndex <= 3);
+          const selected = isSetupPhase
+            ? setupSelection.some((item) => coordEquals(item, coord))
+            : Boolean(selectedPiece && coordEquals(selectedPiece, coord));
+          const legalTarget = legalTargets.find((item) => coordEquals(item.coord, coord));
+          if (!valid) return <div key={`${rowIndex}-${colIndex}`} className="pf-cell pf-hole" />;
+          return (
+            <button
+              key={`${rowIndex}-${colIndex}`}
+              type="button"
+              className={`pf-cell${selected ? " selected" : ""}${isPieceCell(cell) && cellColor(cell) === myColor ? " mine" : ""}${isPieceCell(cell) && cellColor(cell) !== myColor ? " theirs" : ""}${isAnchorCell(cell) ? " anchor" : ""}${setupBlocked ? " setup-blocked" : ""}${legalTarget ? " legal-target" : ""}`}
+              onClick={() => handleCellClick(rowIndex, colIndex)}
+              disabled={setupBlocked}
+              aria-label={setupBlocked ? `Unavailable during ${setupTeam} setup` : legalTarget ? `Legal ${legalTarget.action.type} destination` : cell !== "empty" ? pieceLabel(cell) : `Empty cell ${rowIndex + 1}, ${colIndex + 1}`}
+            >
+              {cell !== "empty" ? <span className={pieceClass(cell)} /> : null}
+              {legalTarget ? <span className="pf-legal-dot" aria-hidden="true" /> : null}
+            </button>
+          );
+        }))}
+      </div>
+      <div className="pushfight-meta">
+        {displayedOutcome && (
+          <p className={`pushfight-outcome ${displayedOutcome}`}>
+            {displayedOutcome === "win" ? "Victory!" : "Defeat!"}
+          </p>
+        )}
+        <p className="game-summary">{statusMessage}</p>
+        {errorMessage && <p className="error game-error" role="alert">{errorMessage}</p>}
+        {!gameOutcome && (
+          <>
+            <p>{currentPlayerId === myId ? "Your turn" : "Waiting for opponent"}</p>
+            {!isSetupPhase && <p>Moves this turn: {movesThisTurn + stagedMoveCount} / 2</p>}
+            <p className={turnComplete || canSubmitSetup ? "ready-description" : undefined}>{selectedDescription}</p>
+            {isSetupPhase && <p className="setup-hint">First 3 pieces are pushers; last 2 are non-pushers.</p>}
+          </>
         )}
       </div>
       <form action={action} className="pushfight-controls">
         <input type="hidden" name="gameId" value={gameId} />
-        <input type="hidden" name="action_type" value={actionType} />
+        <input type="hidden" name="action_type" value={isSetupPhase ? "setup" : turnComplete ? "turn" : ""} />
         <input type="hidden" name="action_payload" value={actionPayload ? JSON.stringify(actionPayload) : ""} />
-
         <div className="form-actions">
-          <button className="button" type="submit" disabled={!canMove || !(isSetupPhase ? canSubmitSetup : canSubmit)}>
-            {isSetupPhase ? "Submit setup" : "Submit action"}
+          <button className="button" type="submit" disabled={!canMove || !(isSetupPhase ? canSubmitSetup : turnComplete)}>
+            {isSetupPhase ? "Submit setup" : "Submit turn"}
           </button>
-          <button className="button small" type="button" onClick={resetSelection} disabled={!canMove}>
+          <button className="button small" type="button" onClick={resetTurn} disabled={!canMove}>
             Reset
           </button>
         </div>
