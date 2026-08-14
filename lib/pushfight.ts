@@ -263,10 +263,12 @@ export function applyMove(board: Board, payload: MovePayload, playerColor: "whit
     const line: Coord[] = [];
     let current: Coord | null = first;
     let offBoard = false;
+    let exitedThroughCutout = false;
     while (current) {
       const currentCell = next[current.row][current.col];
       if (currentCell === "invalid") {
         offBoard = true;
+        exitedThroughCutout = true;
         break;
       }
       if (!isOccupiedCell(currentCell)) break;
@@ -279,7 +281,7 @@ export function applyMove(board: Board, payload: MovePayload, playerColor: "whit
     const lastPos = line[line.length - 1];
     const lastPiece = next[lastPos.row][lastPos.col];
 
-    if (offBoard && (dir === "up" || dir === "down")) {
+    if (offBoard && !exitedThroughCutout && (dir === "up" || dir === "down")) {
       throw new Error("Cannot push a piece through the siderail");
     }
 

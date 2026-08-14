@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Board, Coord, PushfightCell, MovePayload, TurnAction } from "@/lib/pushfight";
 import { applyMove, isValidCoord } from "@/lib/pushfight";
 
@@ -23,6 +23,7 @@ type Props = {
 };
 
 type LegalTarget = { coord: Coord; action: TurnAction; board: Board; winner?: "white" | "black" };
+type Knockout = { piece: PushfightCell; coord: Coord; dir: "up" | "down" | "left" | "right"; id: number };
 
 function coordEquals(a: Coord, b: Coord) {
   return a.row === b.row && a.col === b.col;
@@ -52,6 +53,24 @@ function isPusherCell(cell: PushfightCell) {
 
 function isPieceCell(cell: PushfightCell) {
   return cell !== "empty" && cell !== "invalid";
+}
+
+function pushedOffPiece(board: Board, action: TurnAction): Omit<Knockout, "id"> | null {
+  if (action.type !== "push") return null;
+  const offsets = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] } as const;
+  const [rowStep, colStep] = offsets[action.dir];
+  let row = action.index.row + rowStep;
+  let col = action.index.col + colStep;
+  let last: Coord | null = null;
+
+  while (board[row]?.[col] !== undefined && isPieceCell(board[row][col])) {
+    last = { row, col };
+    row += rowStep;
+    col += colStep;
+  }
+
+  if (!last || board[row]?.[col] === "empty") return null;
+  return { piece: board[last.row][last.col], coord: last, dir: action.dir };
 }
 
 function setupPieceKind(step: number): "pusher" | "nonpusher" {
@@ -90,21 +109,19 @@ export default function PushfightBoard({
   action,
   isSetupPhase,
   setupTeam,
-  statusMessage,
-  errorMessage,
   gameOutcome,
 }: Props) {
   const [selectedPiece, setSelectedPiece] = useState<Coord | null>(null);
   const [setupSelection, setSetupSelection] = useState<Coord[]>([]);
   const [stagedBoard, setStagedBoard] = useState<Board>(board);
   const [stagedActions, setStagedActions] = useState<TurnAction[]>([]);
-  const [stagedWinner, setStagedWinner] = useState<"white" | "black" | null>(null);
+  const [knockout, setKnockout] = useState<Knockout | null>(null);
+  const [stagedOutcome, setStagedOutcome] = useState<"win" | "loss" | null>(null);
+  const knockoutId = useRef(0);
 
   const myColor = myId === whitePlayerId ? "white" : "black";
   const isSetupTurn = isSetupPhase && currentPlayerId === myId;
   const setupPieces = setupSelection.map((coord, idx) => ({ ...coord, kind: setupPieceKind(idx) }));
-  const remainingPushers = 3 - Math.min(setupSelection.length, 3);
-  const remainingNonpushers = Math.max(0, 2 - Math.max(0, setupSelection.length - 3));
   const canSubmitSetup = isSetupPhase && setupSelection.length === 5 && isSetupTurn;
   const stagedMoveCount = stagedActions.filter((item) => item.type === "move").length;
   const turnComplete = stagedActions.at(-1)?.type === "push";
@@ -152,7 +169,8 @@ export default function PushfightBoard({
     setSetupSelection([]);
     setStagedBoard(board);
     setStagedActions([]);
-    setStagedWinner(null);
+    setKnockout(null);
+    setStagedOutcome(null);
   };
 
   const handleCellClick = (row: number, col: number) => {
@@ -172,9 +190,12 @@ export default function PushfightBoard({
     if (turnComplete) return;
     const target = legalTargets.find((item) => coordEquals(item.coord, coord));
     if (target) {
+      const eliminated = target.winner ? pushedOffPiece(stagedBoard, target.action) : null;
+      knockoutId.current += 1;
       setStagedBoard(target.board);
       setStagedActions((current) => [...current, target.action]);
-      setStagedWinner(target.winner ?? null);
+      setKnockout(eliminated ? { ...eliminated, id: knockoutId.current } : null);
+      setStagedOutcome(target.winner ? (target.winner === myColor ? "win" : "loss") : null);
       setSelectedPiece(null);
       return;
     }
@@ -187,21 +208,9 @@ export default function PushfightBoard({
     }
   };
 
-  const selectedDescription = isSetupPhase
-    ? !isSetupTurn
-      ? `Waiting for the ${setupTeam} team to finish setup.`
-      : setupSelection.length < 5
-        ? `Select ${remainingPushers} pusher${remainingPushers === 1 ? "" : "s"} and ${remainingNonpushers} non-pusher${remainingNonpushers === 1 ? "" : "s"}.`
-        : "Ready to submit setup."
-    : turnComplete
-      ? "Turn ready — submit it or reset the board."
-      : selectedPiece
-        ? "Choose one of the dotted legal destinations."
-        : `Choose a piece. ${movesRemaining} optional move${movesRemaining === 1 ? "" : "s"} remaining; your turn must end with a push.`;
-
   const columnLabels = ["A", "B", "C", "D", "E", "F", "G", "H"];
   const rowLabels = ["1", "2", "3", "4"];
-  const displayedOutcome = stagedWinner ? (stagedWinner === myColor ? "win" : "loss") : gameOutcome;
+  const displayedOutcome = stagedOutcome ?? gameOutcome;
 
   return (
     <div className="pushfight-wrapper">
@@ -218,11 +227,13 @@ export default function PushfightBoard({
             ? setupSelection.some((item) => coordEquals(item, coord))
             : Boolean(selectedPiece && coordEquals(selectedPiece, coord));
           const legalTarget = legalTargets.find((item) => coordEquals(item.coord, coord));
-          if (!valid) return <div key={`${rowIndex}-${colIndex}`} className="pf-cell pf-hole" />;
+          const gridPosition = { gridRow: rowIndex + 1, gridColumn: colIndex + 1 };
+          if (!valid) return <div key={`${rowIndex}-${colIndex}`} className="pf-cell pf-hole" style={gridPosition} />;
           return (
             <button
               key={`${rowIndex}-${colIndex}`}
               type="button"
+              style={gridPosition}
               className={`pf-cell${selected ? " selected" : ""}${isPieceCell(cell) && cellColor(cell) === myColor ? " mine" : ""}${isPieceCell(cell) && cellColor(cell) !== myColor ? " theirs" : ""}${isAnchorCell(cell) ? " anchor" : ""}${setupBlocked ? " setup-blocked" : ""}${legalTarget ? " legal-target" : ""}`}
               onClick={() => handleCellClick(rowIndex, colIndex)}
               disabled={setupBlocked}
@@ -233,22 +244,22 @@ export default function PushfightBoard({
             </button>
           );
         }))}
-      </div>
-      <div className="pushfight-meta">
-        {displayedOutcome && (
-          <p className={`pushfight-outcome ${displayedOutcome}`}>
-            {displayedOutcome === "win" ? "Victory!" : "Defeat!"}
-          </p>
+        {knockout && (
+          <div
+            key={knockout.id}
+            className={`pf-knockout pf-knockout-${knockout.dir}`}
+            style={{ gridRow: knockout.coord.row + 1, gridColumn: knockout.coord.col + 1 }}
+            aria-label={`${pieceLabel(knockout.piece)} pushed off the board`}
+          >
+            <span className={pieceClass(knockout.piece)}>
+              <span className="pf-skull" aria-hidden="true">☠</span>
+            </span>
+          </div>
         )}
-        <p className="game-summary">{statusMessage}</p>
-        {errorMessage && <p className="error game-error" role="alert">{errorMessage}</p>}
-        {!gameOutcome && (
-          <>
-            <p>{currentPlayerId === myId ? "Your turn" : "Waiting for opponent"}</p>
-            {!isSetupPhase && <p>Moves this turn: {movesThisTurn + stagedMoveCount} / 2</p>}
-            <p className={turnComplete || canSubmitSetup ? "ready-description" : undefined}>{selectedDescription}</p>
-            {isSetupPhase && <p className="setup-hint">First 3 pieces are pushers; last 2 are non-pushers.</p>}
-          </>
+        {displayedOutcome && (
+          <div className={`pf-result-overlay ${displayedOutcome}`} role="status" aria-live="polite">
+            {displayedOutcome === "win" ? "VICTORY!" : "DEFEAT"}
+          </div>
         )}
       </div>
       <form action={action} className="pushfight-controls">

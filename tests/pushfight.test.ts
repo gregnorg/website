@@ -113,6 +113,16 @@ test("a push cannot send a piece through the top or bottom siderail", () => {
   );
 });
 
+test("pushing a piece from G3 into the open G4 cutout ends the game", () => {
+  const board = emptyBoard();
+  board[0][6] = "white-pusher";
+  board[1][6] = "white-nonpusher";
+  board[2][6] = "black-nonpusher";
+  const result = applyMove(board, { type: "push", index: { row: 0, col: 6 }, dir: "down" }, "white");
+  assert.equal(result.winner, "white");
+  assert.equal(result.board[2][6], "white-nonpusher");
+});
+
 test("move count resets after a push and payload directions are validated", () => {
   const moves: Array<{ payload: MovePayload | null }> = [
     { payload: { type: "move", from: { row: 1, col: 0 }, to: { row: 1, col: 1 } } },
