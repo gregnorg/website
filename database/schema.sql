@@ -20,6 +20,7 @@ CREATE TABLE game_players (
   user_id TEXT NOT NULL REFERENCES "user"(id),
   mark player_mark NOT NULL,
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cleared_at TIMESTAMPTZ,
   PRIMARY KEY (game_id, user_id),
   UNIQUE (game_id, mark)
 );

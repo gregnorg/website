@@ -34,4 +34,6 @@ test("shows completed game status from the player's perspective", () => {
   assert.equal(gameStatusLabel("won", "player-1", "player-1"), "won");
   assert.equal(gameStatusLabel("won", "player-1", "player-2"), "lost");
   assert.equal(gameStatusLabel("draw", null, "player-1"), "draw");
+  assert.equal(gameStatusLabel("active", null, "player-1", true), "your turn");
+  assert.equal(gameStatusLabel("active", null, "player-1", false), "opponent's turn");
 });

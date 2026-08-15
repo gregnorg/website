@@ -8,7 +8,9 @@ export function gameStatusLabel(
   status: string,
   winnerId: string | null,
   playerId: string,
+  isPlayersTurn = false,
 ): string {
+  if (status === "active") return isPlayersTurn ? "your turn" : "opponent's turn";
   if (status !== "won") return status;
   return winnerId === playerId ? "won" : "lost";
 }

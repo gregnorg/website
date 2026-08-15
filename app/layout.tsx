@@ -6,8 +6,8 @@ import { SignOutLink } from "@/components/sign-out-link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Turntable",
-  description: "Simple turn-based games with friends.",
+  title: "Shove Actually",
+  description: "It’s okay to be pushy.",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -17,7 +17,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="en">
       <body>
         <header>
-          <Link className="brand" href="/">Turntable</Link>
+          <Link className="brand" href="/">Shove Actually</Link>
           <nav>
             {session ? (
               <>

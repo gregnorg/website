@@ -1,0 +1,2 @@
+ALTER TABLE game_players
+  ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMPTZ;

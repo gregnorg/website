@@ -99,7 +99,21 @@ export default async function GamePage({
   return (
     <section className="game-page">
       <Link className="back-link" href="/games">← All games</Link>
-      <h1>vs. {game.opponent_username}</h1>
+      <h1 aria-label={`${session.user.username} versus ${game.opponent_username}`}>
+        <span
+          className={game.my_mark === "X" ? "player-white" : "player-black"}
+          title={game.my_mark === "X" ? "White" : "Black"}
+        >
+          {session.user.username}
+        </span>
+        <span className="versus"> vs </span>
+        <span
+          className={game.my_mark === "X" ? "player-black" : "player-white"}
+          title={game.my_mark === "X" ? "Black" : "White"}
+        >
+          {game.opponent_username}
+        </span>
+      </h1>
       {game.game_type === "tic_tac_toe" ? (
         <>
           <p className="game-summary">{summary}</p>

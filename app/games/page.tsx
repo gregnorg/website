@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { gameStatusLabel } from "@/lib/game";
+import { clearFinishedGame } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +15,21 @@ export default async function GamesPage() {
     id: string;
     status: string;
     winner_id: string | null;
+    game_type: string;
+    my_mark: "X" | "O";
+    x_player_id: string;
+    move_count: number;
+    setup_move_count: number;
+    last_turn_player_id: string | null;
     opponent_username: string;
     updated_at: Date;
   }>(
-    `SELECT g.id, g.status, g.winner_id,
-            opponent.username AS opponent_username, g.updated_at
+    `SELECT g.id, g.status, g.winner_id, g.game_type, me.mark AS my_mark,
+            xplayer.user_id AS x_player_id, opponent.username AS opponent_username,
+            g.updated_at, COUNT(m.id)::int AS move_count,
+            COUNT(m.id) FILTER (WHERE m.payload->>'type' = 'setup')::int AS setup_move_count,
+            (ARRAY_AGG(m.player_id ORDER BY m.move_number DESC)
+              FILTER (WHERE m.payload->>'type' IN ('push', 'turn')))[1] AS last_turn_player_id
        FROM games g
        JOIN game_players me
          ON me.game_id = g.id AND me.user_id = $1
@@ -26,6 +37,12 @@ export default async function GamesPage() {
          ON them.game_id = g.id AND them.user_id <> $1
        JOIN "user" opponent
          ON opponent.id = them.user_id
+       JOIN game_players xplayer
+         ON xplayer.game_id = g.id AND xplayer.mark = 'X'
+       LEFT JOIN moves m
+         ON m.game_id = g.id
+      WHERE me.cleared_at IS NULL
+      GROUP BY g.id, me.mark, xplayer.user_id, opponent.username
       ORDER BY g.updated_at DESC`,
     [session.user.id],
   );
@@ -38,17 +55,53 @@ export default async function GamesPage() {
       </div>
       {result.rows.length ? (
         <div className="game-list">
-          {result.rows.map((game) => (
-            <Link className="game-card" href={`/games/${game.id}`} key={game.id}>
-              <div>
-                <h2>vs. {game.opponent_username}</h2>
-                <p>Updated {game.updated_at.toLocaleString()}</p>
-              </div>
-              <span className="status">
-                {gameStatusLabel(game.status, game.winner_id, session.user.id)}
-              </span>
-            </Link>
-          ))}
+          {result.rows.map((game) => {
+            const isPlayersTurn = game.game_type === "tic_tac_toe"
+              ? (game.move_count % 2 === 0 ? game.my_mark === "X" : game.my_mark === "O")
+              : game.setup_move_count < 2
+                ? (game.setup_move_count === 0
+                    ? game.x_player_id === session.user.id
+                    : game.x_player_id !== session.user.id)
+                : game.last_turn_player_id === null
+                  ? game.x_player_id === session.user.id
+                  : game.last_turn_player_id !== session.user.id;
+
+            const isFinished = ["won", "draw", "cancelled"].includes(game.status);
+
+            return <article className="game-card" key={game.id}>
+              <Link className="game-card-link" href={`/games/${game.id}`}>
+                <div>
+                  <h2 aria-label={`${session.user.username} versus ${game.opponent_username}`}>
+                    <span
+                      className={game.my_mark === "X" ? "player-white" : "player-black"}
+                      title={game.my_mark === "X" ? "White" : "Black"}
+                    >
+                      {session.user.username}
+                    </span>
+                    <span className="versus"> vs </span>
+                    <span
+                      className={game.my_mark === "X" ? "player-black" : "player-white"}
+                      title={game.my_mark === "X" ? "Black" : "White"}
+                    >
+                      {game.opponent_username}
+                    </span>
+                  </h2>
+                  <p>Updated {game.updated_at.toLocaleString()}</p>
+                </div>
+                <span className="status">
+                  {gameStatusLabel(game.status, game.winner_id, session.user.id, isPlayersTurn)}
+                </span>
+              </Link>
+              {isFinished && (
+                <form action={clearFinishedGame} className="clear-game-form">
+                  <input type="hidden" name="gameId" value={game.id} />
+                  <button className="clear-game-button" type="submit" aria-label={`Clear game against ${game.opponent_username}`}>
+                    Clear
+                  </button>
+                </form>
+              )}
+            </article>;
+          })}
         </div>
       ) : (
         <div className="empty"><h2>No games yet</h2><p>Start a game and invite a friend by username.</p></div>
