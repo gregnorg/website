@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { gameStatusLabel } from "@/lib/game";
 import { clearFinishedGame } from "./actions";
+import { currentPlayerId, type GameStatus, type GameType, type PlayerMark } from "@/lib/game-state";
+import RefreshOnReturn from "@/components/refresh-on-return";
 
 export const dynamic = "force-dynamic";
 
@@ -13,20 +15,21 @@ export default async function GamesPage() {
   if (!session) redirect("/login");
   const result = await pool.query<{
     id: string;
-    status: string;
+    status: GameStatus;
     winner_id: string | null;
-    game_type: string;
-    my_mark: "X" | "O";
+    game_type: GameType;
+    my_mark: PlayerMark;
     x_player_id: string;
+    o_player_id: string;
     move_count: number;
     setup_move_count: number;
     last_turn_player_id: string | null;
     opponent_username: string;
-    updated_at: Date;
   }>(
     `SELECT g.id, g.status, g.winner_id, g.game_type, me.mark AS my_mark,
-            xplayer.user_id AS x_player_id, opponent.username AS opponent_username,
-            g.updated_at, COUNT(m.id)::int AS move_count,
+            xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id,
+            opponent.username AS opponent_username,
+            COUNT(m.id)::int AS move_count,
             COUNT(m.id) FILTER (WHERE m.payload->>'type' = 'setup')::int AS setup_move_count,
             (ARRAY_AGG(m.player_id ORDER BY m.move_number DESC)
               FILTER (WHERE m.payload->>'type' IN ('push', 'turn')))[1] AS last_turn_player_id
@@ -39,16 +42,19 @@ export default async function GamesPage() {
          ON opponent.id = them.user_id
        JOIN game_players xplayer
          ON xplayer.game_id = g.id AND xplayer.mark = 'X'
+       JOIN game_players oplayer
+         ON oplayer.game_id = g.id AND oplayer.mark = 'O'
        LEFT JOIN moves m
          ON m.game_id = g.id
       WHERE me.cleared_at IS NULL
-      GROUP BY g.id, me.mark, xplayer.user_id, opponent.username
+      GROUP BY g.id, me.mark, xplayer.user_id, oplayer.user_id, opponent.username
       ORDER BY g.updated_at DESC`,
     [session.user.id],
   );
 
   return (
     <section className="page">
+      <RefreshOnReturn />
       <div className="page-heading">
         <div><p className="kicker">Your games</p><h1>Games</h1></div>
         <Link className="button" href="/games/new">New game</Link>
@@ -56,15 +62,17 @@ export default async function GamesPage() {
       {result.rows.length ? (
         <div className="game-list">
           {result.rows.map((game) => {
-            const isPlayersTurn = game.game_type === "tic_tac_toe"
-              ? (game.move_count % 2 === 0 ? game.my_mark === "X" : game.my_mark === "O")
-              : game.setup_move_count < 2
-                ? (game.setup_move_count === 0
-                    ? game.x_player_id === session.user.id
-                    : game.x_player_id !== session.user.id)
-                : game.last_turn_player_id === null
-                  ? game.x_player_id === session.user.id
-                  : game.last_turn_player_id !== session.user.id;
+            const turnPlayerId = currentPlayerId(
+              game.game_type,
+              game.x_player_id,
+              game.o_player_id,
+              {
+                moveCount: game.move_count,
+                setupMoveCount: game.setup_move_count,
+                lastTurnPlayerId: game.last_turn_player_id,
+              },
+            );
+            const isPlayersTurn = turnPlayerId === session.user.id;
 
             const isFinished = ["won", "draw", "cancelled"].includes(game.status);
 
@@ -86,7 +94,7 @@ export default async function GamesPage() {
                       {game.opponent_username}
                     </span>
                   </h2>
-                  <p>Updated {game.updated_at.toLocaleString()}</p>
+                  <p>{game.game_type === "pushfight" ? "Pushfight" : "Tic-tac-toe"}</p>
                 </div>
                 <span className="status">
                   {gameStatusLabel(game.status, game.winner_id, session.user.id, isPlayersTurn)}

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import { clearFinishedGameForPlayer } from "@/lib/game-repository";
 
 export async function clearFinishedGame(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -13,16 +14,12 @@ export async function clearFinishedGame(formData: FormData) {
   const gameId = String(formData.get("gameId") ?? "").trim();
   if (!gameId) redirect("/games");
 
-  await pool.query(
-    `UPDATE game_players AS gp
-        SET cleared_at = now()
-       FROM games AS g
-      WHERE gp.game_id = g.id
-        AND gp.game_id = $1
-        AND gp.user_id = $2
-        AND g.status IN ('won', 'draw', 'cancelled')`,
-    [gameId, session.user.id],
-  );
+  const client = await pool.connect();
+  try {
+    await clearFinishedGameForPlayer(client, gameId, session.user.id);
+  } finally {
+    client.release();
+  }
 
   revalidatePath("/games");
   redirect("/games");

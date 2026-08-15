@@ -3,10 +3,21 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
-import { Board, currentMark, EMPTY_BOARD } from "@/lib/game";
-import { makeMove } from "./actions";
+import { Board, EMPTY_BOARD } from "@/lib/game";
+import { makeMove, resignGame } from "./actions";
 import PushfightBoard from "@/components/pushfight-board";
 import { applyMove, emptyBoard, movesSinceLastPush } from "@/lib/pushfight";
+import type { MovePayload } from "@/lib/pushfight";
+import {
+  currentPlayerId as getCurrentPlayerId,
+  isSetupPhase,
+  summarizeTurns,
+  type GameMove,
+  type GameStatus,
+  type GameType,
+  type PlayerMark,
+} from "@/lib/game-state";
+import RefreshOnReturn from "@/components/refresh-on-return";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +33,16 @@ export default async function GamePage({
   const { id } = await params;
   const { error } = await searchParams;
 
-  const gameResult = await pool.query<any>(
+  const gameResult = await pool.query<{
+    status: GameStatus;
+    winner_id: string | null;
+    game_type: GameType;
+    my_mark: PlayerMark;
+    opponent_username: string;
+    opponent_id: string;
+    x_player_id: string;
+    o_player_id: string;
+  }>(
     `SELECT g.status, g.winner_id, g.game_type, me.mark AS my_mark,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id
@@ -44,7 +64,7 @@ export default async function GamePage({
   const game = gameResult.rows[0];
 
   const isTicTacToe = game.game_type === "tic_tac_toe";
-  const moves = await pool.query<any>(
+  const moves = await pool.query<GameMove>(
     `SELECT m.position, m.payload, gp.mark, m.player_id
        FROM moves m
        LEFT JOIN game_players gp
@@ -56,29 +76,21 @@ export default async function GamePage({
 
   const board = [...EMPTY_BOARD] as Board;
   if (isTicTacToe) {
-    for (const move of moves.rows) board[move.position] = move.mark;
+    for (const move of moves.rows) {
+      if (move.position !== null && move.mark !== null) board[move.position] = move.mark;
+    }
   }
-  const turn = isTicTacToe ? currentMark(board) : null;
   const xPlayerId = game.x_player_id;
   const oPlayerId = game.o_player_id;
-  const setupMoves = moves.rows.filter((mv: any) => mv.payload?.type === "setup");
-  const setupStage = !isTicTacToe && setupMoves.length < 2;
-  const currentPlayerId = (() => {
-    if (setupStage) {
-      return setupMoves.length === 0 ? xPlayerId : oPlayerId;
-    }
-    let lastPushBy: string | null = null;
-    for (const move of moves.rows) {
-      if (move.payload?.type === "push" || move.payload?.type === "turn") lastPushBy = move.player_id;
-    }
-    return lastPushBy === null ? xPlayerId : (lastPushBy === xPlayerId ? oPlayerId : xPlayerId);
-  })();
+  const turnSummary = summarizeTurns(moves.rows);
+  const setupStage = isSetupPhase(game.game_type, turnSummary);
+  const currentPlayerId = getCurrentPlayerId(game.game_type, xPlayerId, oPlayerId, turnSummary);
   const movesThisTurn = movesSinceLastPush(moves.rows);
-  const canMove = game.status === "active" && (isTicTacToe ? turn === game.my_mark : currentPlayerId === session.user.id);
+  const canMove = game.status === "active" && currentPlayerId === session.user.id;
 
   let summary = `Waiting for ${game.opponent_username} to move.`;
   if (setupStage) {
-    const teamName = setupMoves.length === 0 ? "White" : "Black";
+    const teamName = turnSummary.setupMoveCount === 0 ? "White" : "Black";
     summary = canMove
       ? `${teamName} team setup: place 3 squares and 2 circles.`
       : `Waiting for the ${teamName} team to finish setup.`;
@@ -98,6 +110,7 @@ export default async function GamePage({
 
   return (
     <section className="game-page">
+      <RefreshOnReturn />
       <Link className="back-link" href="/games">← All games</Link>
       <h1 aria-label={`${session.user.username} versus ${game.opponent_username}`}>
         <span
@@ -147,7 +160,7 @@ export default async function GamePage({
                 if (!move.payload) continue;
                 try {
                   const moverColor = move.player_id === xPlayerId ? "white" : "black";
-                  pfBoard = applyMove(pfBoard, move.payload, moverColor).board;
+                  pfBoard = applyMove(pfBoard, move.payload as MovePayload, moverColor).board;
                 } catch {
                   // ignore invalid historical moves for display
                 }
@@ -163,13 +176,19 @@ export default async function GamePage({
             movesThisTurn={movesThisTurn}
             action={moveAction}
             isSetupPhase={setupStage}
-            setupTeam={setupMoves.length === 0 ? "white" : "black"}
+            setupTeam={turnSummary.setupMoveCount === 0 ? "white" : "black"}
             setupTurnPlayerId={setupStage ? currentPlayerId : ""}
             statusMessage={summary}
             errorMessage={error}
             gameOutcome={game.status === "won" ? (game.winner_id === session.user.id ? "win" : "loss") : null}
           />
         </>
+      )}
+      {game.status === "active" && (
+        <form action={resignGame} className="resign-form">
+          <input type="hidden" name="gameId" value={id} />
+          <button className="resign-button" type="submit">Resign game</button>
+        </form>
       )}
     </section>
   );

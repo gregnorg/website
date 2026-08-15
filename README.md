@@ -38,7 +38,8 @@ Then set up the application:
 5. Run `npx auth@latest migrate` to create the authentication tables.
 6. Run `psql "$DATABASE_URL" -f database/schema.sql` after exporting the URL,
    or pass the URL from `.env.local` directly to `psql`.
-7. Run `npm run dev` and open `http://localhost:3000` in Windows.
+7. Run `npm run migrate` to apply any migrations added after the base schema.
+8. Run `npm run dev` and open `http://localhost:3000` in Windows.
 
 The local connection should resemble:
 
@@ -84,6 +85,7 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - `npm test` — game-rule tests
 - `npm run lint` — lint checks
 - `npm run build` — production build
+- `npm run migrate` — apply pending database migrations
 - `npm start` — production server on all network interfaces
 
 ## Top-level scripts

@@ -4,13 +4,15 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import { createGameRecord } from "@/lib/game-repository";
+import type { GameType } from "@/lib/game-state";
 
 export async function createGame(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
 
   const username = String(formData.get("username") ?? "").trim();
-  const gameType = String(formData.get("game_type") ?? "pushfight").trim();
+  const gameType = String(formData.get("game_type") ?? "pushfight").trim() as GameType;
   if (!["tic_tac_toe", "pushfight"].includes(gameType)) {
     redirect("/games/new?error=Invalid+game+type.");
   }
@@ -35,17 +37,7 @@ export async function createGame(formData: FormData) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const game = await client.query<{ id: string }>(
-      `INSERT INTO games (created_by, status, game_type)
-       VALUES ($1, 'active', $2)
-       RETURNING id`,
-      [session.user.id, gameType],
-    );
-    await client.query(
-      `INSERT INTO game_players (game_id, user_id, mark)
-       VALUES ($1, $2, 'X'), ($1, $3, 'O')`,
-      [game.rows[0].id, session.user.id, opponent.rows[0].id],
-    );
+    await createGameRecord(client, session.user.id, opponent.rows[0].id, gameType);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

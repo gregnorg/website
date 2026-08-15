@@ -40,83 +40,73 @@ export type LegacyMovePayload =
   | { type: "push"; index: number; dir: Direction }
   | { type: "setup"; pieces: Array<SetupPiece | { index: number; kind: "pusher" | "nonpusher" }> };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isDirection(value: unknown): value is Direction {
+  return value === "up" || value === "down" || value === "left" || value === "right";
+}
+
+function readCoord(value: unknown): Coord | null {
+  if (!isRecord(value)) return null;
+  return Number.isInteger(value.row) && Number.isInteger(value.col)
+    ? { row: value.row as number, col: value.col as number }
+    : null;
+}
+
+function readSetupPiece(value: unknown): SetupPiece {
+  if (!isRecord(value) || (value.kind !== "pusher" && value.kind !== "nonpusher")) {
+    throw new Error("Invalid setup piece.");
+  }
+  if (Number.isInteger(value.index)) {
+    return { ...indexToCoord(value.index as number), kind: value.kind };
+  }
+  const coord = readCoord(value);
+  if (!coord) throw new Error("Invalid setup piece.");
+  return { ...coord, kind: value.kind };
+}
+
 export function normalizeMovePayload(payload: unknown): MovePayload {
-  if (!payload || typeof payload !== "object") {
+  if (!isRecord(payload)) {
     throw new Error("Invalid move payload.");
   }
 
-  const typed = payload as { type?: unknown };
-  if (typed.type === "move") {
-    const movePayload = payload as LegacyMovePayload | MovePayload;
-    if (typeof (movePayload as any).from === "number" && typeof (movePayload as any).to === "number") {
+  if (payload.type === "move") {
+    if (typeof payload.from === "number" && typeof payload.to === "number") {
       return {
         type: "move",
-        from: indexToCoord((movePayload as any).from),
-        to: indexToCoord((movePayload as any).to),
+        from: indexToCoord(payload.from),
+        to: indexToCoord(payload.to),
       };
     }
-    if (
-      typeof (movePayload as any).from === "object" &&
-      typeof (movePayload as any).from?.row === "number" &&
-      typeof (movePayload as any).from?.col === "number" &&
-      typeof (movePayload as any).to === "object" &&
-      typeof (movePayload as any).to?.row === "number" &&
-      typeof (movePayload as any).to?.col === "number"
-    ) {
-      return movePayload as MovePayload;
-    }
+    const from = readCoord(payload.from);
+    const to = readCoord(payload.to);
+    if (from && to) return { type: "move", from, to };
     throw new Error("Invalid move payload.");
   }
 
-  if (typed.type === "push") {
-    const pushPayload = payload as LegacyMovePayload | MovePayload;
-    const direction = (pushPayload as any).dir;
-    if (!["up", "down", "left", "right"].includes(direction)) {
+  if (payload.type === "push") {
+    if (!isDirection(payload.dir)) {
       throw new Error("Invalid push direction.");
     }
-    if (typeof (pushPayload as any).index === "number") {
-      return {
-        type: "push",
-        index: indexToCoord((pushPayload as any).index),
-        dir: direction,
-      };
+    if (typeof payload.index === "number") {
+      return { type: "push", index: indexToCoord(payload.index), dir: payload.dir };
     }
-    if (
-      typeof (pushPayload as any).index === "object" &&
-      typeof (pushPayload as any).index?.row === "number" &&
-      typeof (pushPayload as any).index?.col === "number"
-    ) {
-      return { type: "push", index: (pushPayload as any).index, dir: direction };
-    }
+    const index = readCoord(payload.index);
+    if (index) return { type: "push", index, dir: payload.dir };
     throw new Error("Invalid push payload.");
   }
 
-  if (typed.type === "setup") {
-    const setupPayload = payload as any;
-    if (!Array.isArray(setupPayload.pieces)) {
+  if (payload.type === "setup") {
+    if (!Array.isArray(payload.pieces)) {
       throw new Error("Invalid setup payload.");
     }
-    const normalizedPieces = (setupPayload.pieces as any[]).map((piece: any) => {
-      if (typeof (piece as any).index === "number") {
-        return {
-          row: indexToCoord((piece as any).index).row,
-          col: indexToCoord((piece as any).index).col,
-          kind: (piece as any).kind,
-        };
-      }
-      if (
-        typeof (piece as any).row === "number" &&
-        typeof (piece as any).col === "number"
-      ) {
-        return piece as SetupPiece;
-      }
-      throw new Error("Invalid setup piece.");
-    });
-    return { type: "setup", pieces: normalizedPieces };
+    return { type: "setup", pieces: payload.pieces.map(readSetupPiece) };
   }
 
-  if (typed.type === "turn") {
-    const actions = (payload as any).actions;
+  if (payload.type === "turn") {
+    const actions = payload.actions;
     if (!Array.isArray(actions) || actions.length < 1 || actions.length > 3) {
       throw new Error("A turn must contain a push and no more than two moves.");
     }

@@ -8,6 +8,7 @@ import {
   play,
   winner,
 } from "../lib/game.ts";
+import { currentPlayerId, summarizeTurns } from "../lib/game-state.ts";
 
 test("players alternate turns", () => {
   const afterX = play(EMPTY_BOARD, 0, "X");
@@ -36,4 +37,22 @@ test("shows completed game status from the player's perspective", () => {
   assert.equal(gameStatusLabel("draw", null, "player-1"), "draw");
   assert.equal(gameStatusLabel("active", null, "player-1", true), "your turn");
   assert.equal(gameStatusLabel("active", null, "player-1", false), "opponent's turn");
+});
+
+test("shared turn state handles tic-tac-toe and Pushfight setup and turns", () => {
+  assert.equal(currentPlayerId("tic_tac_toe", "x", "o", {
+    moveCount: 3, setupMoveCount: 0, lastTurnPlayerId: null,
+  }), "o");
+
+  const afterWhiteSetup = summarizeTurns([
+    { player_id: "white", payload: { type: "setup", pieces: [] } },
+  ]);
+  assert.equal(currentPlayerId("pushfight", "white", "black", afterWhiteSetup), "black");
+
+  const afterWhiteTurn = summarizeTurns([
+    { player_id: "white", payload: { type: "setup", pieces: [] } },
+    { player_id: "black", payload: { type: "setup", pieces: [] } },
+    { player_id: "white", payload: { type: "turn", actions: [{ type: "push", index: { row: 1, col: 1 }, dir: "right" }] } },
+  ]);
+  assert.equal(currentPlayerId("pushfight", "white", "black", afterWhiteTurn), "black");
 });

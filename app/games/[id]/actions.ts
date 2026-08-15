@@ -6,7 +6,28 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { Board, EMPTY_BOARD, isDraw, play, winner } from "@/lib/game";
-import { applyMove, emptyBoard as pfInitialBoard, MovePayload, Direction, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
+import { applyMove, emptyBoard as pfInitialBoard, MovePayload, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
+import { getMoveGameForPlayer, resignGameForPlayer } from "@/lib/game-repository";
+import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type PlayerMark } from "@/lib/game-state";
+
+export async function resignGame(formData: FormData) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/login");
+
+  const gameId = String(formData.get("gameId") ?? "").trim();
+  if (!gameId) redirect("/games");
+
+  const client = await pool.connect();
+  try {
+    await resignGameForPlayer(client, gameId, session.user.id);
+  } finally {
+    client.release();
+  }
+
+  revalidatePath(`/games/${gameId}`);
+  revalidatePath("/games");
+  redirect(`/games/${gameId}`);
+}
 
 export async function makeMove(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -19,24 +40,23 @@ export async function makeMove(formData: FormData) {
   let message = "";
   try {
     await client.query("BEGIN");
-    const game = await client.query<{ status: string; game_type: string }>(
-      "SELECT status, game_type FROM games WHERE id = $1 FOR UPDATE",
-      [gameId],
-    );
-    if (!game.rowCount) {
-      message = "That game does not exist.";
-    } else if (game.rows[0].status !== "active") {
+    const game = await getMoveGameForPlayer(client, gameId, session.user.id);
+    if (!game) {
+      await client.query("ROLLBACK");
+      revalidatePath("/games");
+      redirect(`/games?error=${encodeURIComponent("That game does not exist or you are not a player in it.")}`);
+    }
+    if (game.status !== "active") {
       message = "This game is already finished.";
     }
 
-    const players = await client.query<{ user_id: string; mark: "X" | "O" }>(
+    const players = await client.query<{ user_id: string; mark: PlayerMark }>(
       "SELECT user_id, mark FROM game_players WHERE game_id = $1",
       [gameId],
     );
-    const player = players.rows.find((row) => row.user_id === session.user.id);
-    if (!message && !player) message = "You are not a player in this game.";
+    const player = players.rows.find((row) => row.user_id === session.user.id)!;
 
-    const moves = await client.query<any>(
+    const moves = await client.query<GameMove>(
       `SELECT m.position, m.payload, m.player_id, gp.mark
          FROM moves m
          LEFT JOIN game_players gp
@@ -47,9 +67,11 @@ export async function makeMove(formData: FormData) {
     );
 
     // Handle Tic-tac-toe as before
-    if (game.rows[0].game_type === "tic_tac_toe") {
+    if (game.game_type === "tic_tac_toe") {
       const board = [...EMPTY_BOARD] as Board;
-      for (const move of moves.rows) board[move.position] = move.mark;
+      for (const move of moves.rows) {
+        if (move.position !== null && move.mark !== null) board[move.position] = move.mark;
+      }
 
       const position = Number(formData.get("position"));
       let nextBoard: Board | undefined;
@@ -126,17 +148,9 @@ export async function makeMove(formData: FormData) {
       }
     }
 
-    const setupMoves = moves.rows.filter((mv) => mv.payload?.type === "setup");
-    const setupStage = setupMoves.length < 2;
-
-    // During setup white places first, then black. Afterwards a push ends the turn.
-    let lastPushBy: string | null = null;
-    for (const mv of moves.rows) {
-      if (mv.payload && (mv.payload.type === "push" || mv.payload.type === "turn")) lastPushBy = mv.player_id;
-    }
-    const expectedPlayer = setupStage
-      ? (setupMoves.length === 0 ? playerX : playerO)
-      : lastPushBy === null ? playerX : (lastPushBy === playerX ? playerO : playerX);
+    const turnSummary = summarizeTurns(moves.rows);
+    const setupStage = isSetupPhase(game.game_type, turnSummary);
+    const expectedPlayer = currentPlayerId(game.game_type, playerX!, playerO!, turnSummary);
     if (!message && session.user.id !== expectedPlayer) message = "It is not your turn.";
 
     let actionPayload: MovePayload | null = null;

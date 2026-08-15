@@ -65,6 +65,9 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .game-square { width:100%; aspect-ratio:1; display:grid; place-items:center; padding:0; border:1px solid var(--ink); color:var(--ink); background:var(--white); font:700 42px/1 Arial, sans-serif; cursor:pointer; }
 .game-square:not(:disabled):hover { background:#e5eee9; }
 .game-square:disabled { cursor:default; }
+.resign-form { display:block; margin:28px 0 0; }
+.resign-button { padding:6px; border:0; color:#a12d25; background:transparent; font:inherit; font-size:14px; text-decoration:underline; cursor:pointer; }
+.resign-button:hover { color:#711c16; }
 .pushfight-wrapper { display:grid; gap:20px; padding:24px; border-radius:28px; background:linear-gradient(180deg, #f4ede2 0%, #e7d9c8 100%); box-shadow:0 18px 40px rgba(12,18,15,.12); }
 .pushfight-meta { display:grid; gap:8px; text-align:left; color:var(--ink); }
 .pushfight-meta p { margin:0; font-size:15px; }

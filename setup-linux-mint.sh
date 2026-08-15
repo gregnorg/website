@@ -137,6 +137,7 @@ sudo -u "${APP_USER}" -H env \
     else
       echo "Game tables already exist; skipping database/schema.sql."
     fi
+    npm run migrate
   '
 
 echo
