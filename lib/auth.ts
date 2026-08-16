@@ -4,6 +4,7 @@ import { hostname, networkInterfaces } from "node:os";
 import { pool } from "@/lib/db";
 
 const port = process.env.PORT ?? "3000";
+const productionHosts = ["shoveactually.com", "www.shoveactually.com"];
 const localHosts = new Set([
   `localhost:${port}`,
   `127.0.0.1:${port}`,
@@ -21,15 +22,25 @@ for (const addresses of Object.values(networkInterfaces())) {
 
 export const auth = betterAuth({
   baseURL: {
-    allowedHosts: [...localHosts],
-    // This server is accessed directly over HTTP on the local network.
-    // Change this to "https" when an HTTPS reverse proxy is added.
-    protocol: "http",
+    allowedHosts: [...productionHosts, ...localHosts],
+    protocol: process.env.NODE_ENV === "production" ? "https" : "http",
   },
   database: pool,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+  },
+  rateLimit: {
+    enabled: process.env.NODE_ENV === "production",
+    customRules: {
+      "/sign-in/email": { window: 60, max: 10 },
+      "/sign-up/email": { window: 60, max: 5 },
+    },
+  },
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["cf-connecting-ip"],
+    },
   },
   plugins: [username({
     minUsernameLength: 3,
