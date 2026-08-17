@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { SignOutLink } from "@/components/sign-out-link";
+import { isAdmin } from "@/lib/admin";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const session = await auth.api.getSession({ headers: await headers() });
+  const admin = session ? await isAdmin(session.user.id) : false;
 
   return (
     <html lang="en">
@@ -23,6 +25,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               <>
                 <Link className="header-username" href="/account">{session.user.username}</Link>
                 <Link href="/games">Games</Link>
+                {admin && <Link href="/admin">Admin</Link>}
                 <SignOutLink />
               </>
             ) : (

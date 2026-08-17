@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
-import { username } from "better-auth/plugins";
+import { admin, username } from "better-auth/plugins";
 import { hostname, networkInterfaces } from "node:os";
 import { pool } from "@/lib/db";
 
@@ -61,9 +61,12 @@ export const auth = betterAuth({
       ipAddressHeaders: ["cf-connecting-ip"],
     },
   },
-  plugins: [username({
-    minUsernameLength: 3,
-    maxUsernameLength: 24,
-    usernameNormalization: false,
-  })],
+  plugins: [
+    username({
+      minUsernameLength: 3,
+      maxUsernameLength: 24,
+      usernameNormalization: false,
+    }),
+    admin(),
+  ],
 });

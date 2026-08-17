@@ -41,6 +41,17 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .account-panel h2 + p { margin-bottom:0; }
 .checkbox-label { grid-template-columns:auto 1fr; align-items:center; justify-content:start; font-weight:400; }
 .checkbox-label input { width:auto; }
+.admin-page h2 { margin:42px 0 14px; }
+.admin-message { margin:24px 0 0; }
+.admin-list { display:grid; gap:10px; }
+.admin-card { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:18px 20px; border:1px solid var(--line); background:var(--white); }
+.admin-card strong + .status { margin-left:10px; }
+.admin-card p { margin:4px 0 0; color:var(--muted); font-size:14px; }
+.admin-delete-form { display:flex; grid-template-columns:1fr auto; align-items:center; gap:8px; margin:0; }
+.admin-delete-form input { width:170px; }
+.danger-button { padding:9px 12px; border:1px solid #a12d25; border-radius:4px; color:#a12d25; background:#fff; font:inherit; font-weight:700; cursor:pointer; }
+.danger-button:hover { color:#fff; background:#a12d25; }
+.admin-cleanup-form { max-width:520px; padding:20px; border:1px solid var(--line); background:var(--white); }
 .switch { margin:24px 0 0; font-size:14px; }
 .page { width:min(960px, calc(100% - 40px)); margin:auto; padding:58px 0; }
 .page-heading { display:flex; align-items:end; justify-content:space-between; }
