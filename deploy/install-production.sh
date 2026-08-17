@@ -7,9 +7,29 @@ if [[ ${EUID} -ne 0 || -z ${SUDO_USER:-} || ${SUDO_USER} == root ]]; then
   exit 1
 fi
 
-WEBSITE_DIR=/home/gregnorg/website
-APP_USER=gregnorg
-APP_GROUP=gregnorg
+WEBSITE_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+APP_USER=${SUDO_USER}
+APP_GROUP=$(id -gn "${APP_USER}")
+APP_HOME=$(getent passwd "${APP_USER}" | cut -d: -f6)
+NODE_BIN=$(sudo -u "${APP_USER}" -H env NVM_DIR="${APP_HOME}/.nvm" bash -c \
+  'source "$NVM_DIR/nvm.sh" && command -v node')
+
+if [[ ! -x ${NODE_BIN} ]]; then
+  echo "Node.js executable was not found for ${APP_USER}." >&2
+  exit 1
+fi
+
+render_unit() {
+  local source_file=$1
+  local destination_file=$2
+  sed \
+    -e "s|@@APP_USER@@|${APP_USER}|g" \
+    -e "s|@@APP_GROUP@@|${APP_GROUP}|g" \
+    -e "s|@@WEBSITE_DIR@@|${WEBSITE_DIR}|g" \
+    -e "s|@@NODE_BIN@@|${NODE_BIN}|g" \
+    "${source_file}" > "${destination_file}"
+  chmod 0644 "${destination_file}"
+}
 
 systemctl disable --now \
   turntable.service \
@@ -22,12 +42,14 @@ rm -f \
   /etc/systemd/system/turntable-healthcheck.service \
   /etc/systemd/system/turntable-healthcheck.timer
 
-install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually.service" /etc/systemd/system/shoveactually.service
-install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-backup.service" /etc/systemd/system/shoveactually-backup.service
+render_unit "${WEBSITE_DIR}/deploy/shoveactually.service" /etc/systemd/system/shoveactually.service
+render_unit "${WEBSITE_DIR}/deploy/shoveactually-backup.service" /etc/systemd/system/shoveactually-backup.service
 install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-backup.timer" /etc/systemd/system/shoveactually-backup.timer
 install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-healthcheck.service" /etc/systemd/system/shoveactually-healthcheck.service
 install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-healthcheck.timer" /etc/systemd/system/shoveactually-healthcheck.timer
 install -m 0644 "${WEBSITE_DIR}/deploy/cloudflared.service" /etc/systemd/system/cloudflared.service
+install -m 0644 "${WEBSITE_DIR}/deploy/cloudflared-update.service" /etc/systemd/system/cloudflared-update.service
+install -m 0644 "${WEBSITE_DIR}/deploy/cloudflared-update.timer" /etc/systemd/system/cloudflared-update.timer
 install -d -m 0700 -o "${APP_USER}" -g "${APP_GROUP}" /var/backups/turntable
 
 systemctl daemon-reload

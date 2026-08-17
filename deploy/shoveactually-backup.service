@@ -5,10 +5,10 @@ Requires=postgresql.service
 
 [Service]
 Type=oneshot
-User=gregnorg
-Group=gregnorg
-EnvironmentFile=/home/gregnorg/website/.env.local
-ExecStart=/home/gregnorg/website/scripts/backup-database.sh
+User=@@APP_USER@@
+Group=@@APP_GROUP@@
+EnvironmentFile=@@WEBSITE_DIR@@/.env.local
+ExecStart=@@WEBSITE_DIR@@/scripts/backup-database.sh
 Nice=10
 NoNewPrivileges=true
 PrivateTmp=true

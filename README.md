@@ -1,6 +1,26 @@
-# Turntable
+# Shove Actually
 
 A deliberately simple asynchronous board-game site. The first playable game is tic-tac-toe; the long-term goal is Push Fight.
+
+## Blank Linux Mint installation
+
+Copy or clone this repository onto the new machine, then create a remotely
+managed Cloudflare Tunnel whose public hostname routes to
+`http://localhost:3000`. Copy its tunnel token and run:
+
+```sh
+cd /path/to/website
+sudo ./setup-linux-mint.sh
+```
+
+The script securely prompts for the Cloudflare token. It installs PostgreSQL,
+Node.js 24, cloudflared, dependencies, database schemas and migrations,
+production services, automatic updates, health monitoring, and daily backups.
+Database and authentication secrets are generated automatically. It then builds
+and starts Shove Actually and performs a real backup/restore test.
+
+The script is safe to rerun: it preserves an existing `.env.local`, database,
+and tunnel token while updating packages, migrations, builds, and services.
 
 ## Local setup
 

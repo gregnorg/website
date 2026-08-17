@@ -1,0 +1,9 @@
+[Unit]
+Description=Update cloudflared from Cloudflare's APT repository
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/apt-get update
+ExecStart=/usr/bin/apt-get install -y --only-upgrade cloudflared

@@ -7,7 +7,8 @@ if [[ ${EUID} -ne 0 ]]; then
   exit 1
 fi
 
-WEBSITE_DIR=/home/gregnorg/website
+WEBSITE_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+APP_USER=${SUDO_USER:-$(stat -c '%U' "${WEBSITE_DIR}")}
 BACKUP_DIR=/var/backups/turntable
 RESTORE_DATABASE=turntable_restore_test
 
@@ -35,9 +36,9 @@ trap cleanup EXIT
 
 cleanup
 sudo -u postgres createdb --owner=turntable "${RESTORE_DATABASE}"
-sudo -u gregnorg pg_restore --dbname="${RESTORE_URL}" --no-owner --no-privileges "${LATEST_BACKUP}"
+sudo -u "${APP_USER}" pg_restore --dbname="${RESTORE_URL}" --no-owner --no-privileges "${LATEST_BACKUP}"
 
-TABLES_OK=$(sudo -u gregnorg psql "${RESTORE_URL}" -v ON_ERROR_STOP=1 -tAc \
+TABLES_OK=$(sudo -u "${APP_USER}" psql "${RESTORE_URL}" -v ON_ERROR_STOP=1 -tAc \
   "SELECT to_regclass('public.games') IS NOT NULL AND to_regclass('public.user') IS NOT NULL")
 if [[ ${TABLES_OK} != t ]]; then
   echo "Restore completed, but expected tables were not found." >&2

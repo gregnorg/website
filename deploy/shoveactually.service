@@ -6,13 +6,13 @@ Requires=postgresql.service
 
 [Service]
 Type=simple
-User=gregnorg
-Group=gregnorg
-WorkingDirectory=/home/gregnorg/website
+User=@@APP_USER@@
+Group=@@APP_GROUP@@
+WorkingDirectory=@@WEBSITE_DIR@@
 Environment=NODE_ENV=production
 Environment=PORT=3000
-EnvironmentFile=/home/gregnorg/website/.env.local
-ExecStart=/home/gregnorg/.nvm/versions/node/v24.18.1/bin/node /home/gregnorg/website/node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
+EnvironmentFile=@@WEBSITE_DIR@@/.env.local
+ExecStart=@@NODE_BIN@@ @@WEBSITE_DIR@@/node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -20,7 +20,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/gregnorg/website/.next
+ReadWritePaths=@@WEBSITE_DIR@@/.next
 
 [Install]
 WantedBy=multi-user.target

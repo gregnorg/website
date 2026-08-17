@@ -3,13 +3,13 @@
 set -Eeuo pipefail
 
 # -----------------------------------------------------------------------------
-# FIRST-RUN CONFIGURATION: edit these values before the first run. They may be
-# left blank on later runs because the existing .env.local will be preserved.
-# Use a URL-safe database password (letters, numbers, hyphens, and underscores)
-# because it is placed directly in DATABASE_URL.
+# Optional first-run configuration. Secure database and authentication secrets
+# are generated automatically when omitted. A remotely-managed Cloudflare
+# Tunnel token is requested securely when /etc/cloudflared/token is absent.
 # -----------------------------------------------------------------------------
-DB_PASSWORD=""         # FIRST RUN: choose a strong password
-BETTER_AUTH_SECRET=""  # FIRST RUN: generate with: openssl rand -base64 32
+DB_PASSWORD="${DB_PASSWORD:-}"
+BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-}"
+CLOUDFLARE_TUNNEL_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
 
 # Optional configuration. The defaults normally do not need to be changed.
 DB_USER="turntable"
@@ -27,11 +27,6 @@ fi
 
 if [[ -z ${SUDO_USER:-} || ${SUDO_USER} == "root" ]]; then
   echo "Run this script from your normal account using sudo, not as root directly." >&2
-  exit 1
-fi
-
-if [[ ! -f ${ENV_FILE} && ( -z ${DB_PASSWORD} || -z ${BETTER_AUTH_SECRET} ) ]]; then
-  echo "For the first run, configure DB_PASSWORD and BETTER_AUTH_SECRET at the top of this script." >&2
   exit 1
 fi
 
@@ -55,6 +50,17 @@ APP_USER=${SUDO_USER}
 APP_HOME=$(getent passwd "${APP_USER}" | cut -d: -f6)
 NVM_DIR="${APP_HOME}/.nvm"
 
+echo "Installing Linux packages..."
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  curl ca-certificates build-essential postgresql postgresql-client openssl
+systemctl enable --now postgresql
+
+if [[ ! -f ${ENV_FILE} ]]; then
+  DB_PASSWORD=${DB_PASSWORD:-$(openssl rand -hex 32)}
+  BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-$(openssl rand -base64 32)}
+fi
+
 if [[ -f ${ENV_FILE} ]]; then
   DATABASE_URL=$(sed -n 's/^DATABASE_URL=//p' "${ENV_FILE}" | head -n 1)
   EFFECTIVE_AUTH_SECRET=$(sed -n 's/^BETTER_AUTH_SECRET=//p' "${ENV_FILE}" | head -n 1)
@@ -67,11 +73,30 @@ else
   EFFECTIVE_AUTH_SECRET=${BETTER_AUTH_SECRET}
 fi
 
-echo "Installing Linux packages..."
+echo "Installing Cloudflare Tunnel..."
+install -d -m 0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+  -o /usr/share/keyrings/cloudflare-main.gpg
+chmod 0644 /usr/share/keyrings/cloudflare-main.gpg
+printf '%s\n' \
+  'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' \
+  > /etc/apt/sources.list.d/cloudflared.list
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  curl ca-certificates build-essential postgresql postgresql-client openssl
-systemctl enable --now postgresql
+DEBIAN_FRONTEND=noninteractive apt-get install -y cloudflared
+
+if [[ ! -f /etc/cloudflared/token ]]; then
+  if [[ -z ${CLOUDFLARE_TUNNEL_TOKEN} ]]; then
+    read -r -s -p "Cloudflare Tunnel token: " CLOUDFLARE_TUNNEL_TOKEN
+    echo
+  fi
+  if [[ -z ${CLOUDFLARE_TUNNEL_TOKEN} || ${CLOUDFLARE_TUNNEL_TOKEN} == *$'\n'* ]]; then
+    echo "A valid Cloudflare Tunnel token is required." >&2
+    exit 1
+  fi
+  install -d -m 0755 /etc/cloudflared
+  printf '%s' "${CLOUDFLARE_TUNNEL_TOKEN}" \
+    | install -m 0600 -o root -g root /dev/stdin /etc/cloudflared/token
+fi
 
 echo "Installing nvm and Node.js ${NODE_VERSION} for ${APP_USER}..."
 if [[ ! -s "${NVM_DIR}/nvm.sh" ]]; then
@@ -138,10 +163,12 @@ sudo -u "${APP_USER}" -H env \
       echo "Game tables already exist; skipping database/schema.sql."
     fi
     npm run migrate
+    npm run build
   '
 
 echo
-echo "Setup complete. The server was not built or started."
-echo "Install the production services next:"
-echo "  cd ${WEBSITE_DIR}"
-echo "  sudo ./deploy/install-production.sh"
+echo "Installing and starting production services..."
+"${WEBSITE_DIR}/deploy/install-production.sh"
+
+echo
+echo "Setup complete. Shove Actually is installed and running."
