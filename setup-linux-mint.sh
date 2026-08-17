@@ -142,7 +142,6 @@ sudo -u "${APP_USER}" -H env \
 
 echo
 echo "Setup complete. The server was not built or started."
-echo "To run it later as ${APP_USER}:"
+echo "Install the production services next:"
 echo "  cd ${WEBSITE_DIR}"
-echo "  npm run build"
-echo "  npm start"
+echo "  sudo ./deploy/install-production.sh"

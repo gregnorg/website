@@ -11,7 +11,10 @@ export default function Home() {
   return (
     <section className="center hero">
       <h1>It’s okay to be pushy.</h1>
-      <div className="actions"><Link className="button" href="/signup">Create an account</Link><Link href="/login">Log in</Link></div>
+      <div className="actions">
+        <Link className="button" href="/signup">Create an account</Link>
+        <Link href="/login">Log in</Link>
+      </div>
       <div className="home-pushfight" role="img" aria-label="Pushfight board with black and white pieces">
         {pushfightPreview.flatMap((row, rowIndex) => row.map((cell, colIndex) => (
           <span key={`${rowIndex}-${colIndex}`} className={`home-pf-cell${cell === "invalid" ? " home-pf-hole" : ""}`}>

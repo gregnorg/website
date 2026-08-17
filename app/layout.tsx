@@ -21,7 +21,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <nav>
             {session ? (
               <>
-                <Link className="header-username" href="/games">{session.user.username}</Link>
+                <Link className="header-username" href="/account">{session.user.username}</Link>
+                <Link href="/games">Games</Link>
                 <SignOutLink />
               </>
             ) : (

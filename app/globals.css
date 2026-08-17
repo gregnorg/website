@@ -35,6 +35,12 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .password-toggle { position:absolute; top:50%; right:10px; padding:4px; border:0; color:var(--accent); background:transparent; font:inherit; font-size:13px; font-weight:700; cursor:pointer; transform:translateY(-50%); }
 .password-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .error { margin:0; color:#a12d25; font-size:14px; }
+.success { margin:0; color:var(--accent); font-size:14px; font-weight:700; }
+.account-panel { width:min(480px, calc(100% - 32px)); }
+.account-panel h2 { margin:28px 0 6px; font-size:22px; }
+.account-panel h2 + p { margin-bottom:0; }
+.checkbox-label { grid-template-columns:auto 1fr; align-items:center; justify-content:start; font-weight:400; }
+.checkbox-label input { width:auto; }
 .switch { margin:24px 0 0; font-size:14px; }
 .page { width:min(960px, calc(100% - 40px)); margin:auto; padding:58px 0; }
 .page-heading { display:flex; align-items:end; justify-content:space-between; }

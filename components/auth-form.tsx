@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({ mode, allowSignup = false }: { mode: "login" | "signup"; allowSignup?: boolean }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -65,7 +65,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             <input
               name="password"
               type={showPassword ? "text" : "password"}
-              minLength={8}
+              minLength={signup ? 12 : 8}
               autoComplete={signup ? "new-password" : "current-password"}
               required
             />
@@ -83,7 +83,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         {error && <p className="error" role="alert">{error}</p>}
         <button className="button" disabled={busy}>{busy ? "Please wait…" : signup ? "Create account" : "Log in"}</button>
       </form>
-      <p className="switch">{signup ? "Already have an account?" : "Need an account?"} <Link href={signup ? "/login" : "/signup"}>{signup ? "Log in" : "Sign up"}</Link></p>
+      {(signup || allowSignup) && (
+        <p className="switch">{signup ? "Already have an account?" : "Need an account?"} <Link href={signup ? "/login" : "/signup"}>{signup ? "Log in" : "Sign up"}</Link></p>
+      )}
     </section>
   );
 }

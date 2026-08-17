@@ -1,0 +1,12 @@
+[Unit]
+Description=Check Shove Actually application and database health
+After=shoveactually.service
+Requires=shoveactually.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3000/api/health
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

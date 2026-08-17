@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { username } from "better-auth/plugins";
 import { hostname, networkInterfaces } from "node:os";
 import { pool } from "@/lib/db";
@@ -26,9 +27,27 @@ export const auth = betterAuth({
     protocol: process.env.NODE_ENV === "production" ? "https" : "http",
   },
   database: pool,
+  databaseHooks: {
+    user: {
+      create: {
+        before: async () => {
+          const result = await pool.query<{ count: number }>(
+            `SELECT count(*)::int AS count FROM "user"`,
+          );
+          if (result.rows[0].count >= 50) {
+            throw new APIError("BAD_REQUEST", {
+              message: "Shove Actually has reached its 50-player limit.",
+            });
+          }
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    minPasswordLength: 12,
+    maxPasswordLength: 128,
   },
   rateLimit: {
     enabled: process.env.NODE_ENV === "production",

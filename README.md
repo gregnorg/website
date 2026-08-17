@@ -53,8 +53,8 @@ PostgreSQL may need to be started again after WSL restarts:
 sudo service postgresql start
 ```
 
-The development and production servers listen on `0.0.0.0`, so they are
-reachable outside the Ubuntu guest rather than only from inside WSL.
+The development server listens on `0.0.0.0`. The production server listens on
+`127.0.0.1` and is intended to be reached through the local Cloudflare Tunnel.
 
 ## Host from WSL
 
@@ -66,8 +66,12 @@ npm run build
 npm start
 ```
 
-Keep the WSL terminal open while the server is running. Windows normally
-forwards `http://localhost:3000` to WSL automatically.
+For public hosting, install the service files under `deploy/` so the application
+and database backups survive reboots without an open terminal.
+
+```sh
+sudo ./deploy/install-production.sh
+```
 
 To make the site available to other devices on the same network:
 
@@ -86,7 +90,21 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - `npm run lint` — lint checks
 - `npm run build` — production build
 - `npm run migrate` — apply pending database migrations
-- `npm start` — production server on all network interfaces
+- `npm start` — production server on loopback for the local reverse proxy/tunnel
+
+## Production operations
+
+- Public registration is always available until the database reaches its hard
+  limit of 50 users. The database serializes concurrent signups so the limit
+  cannot be exceeded.
+- `GET /api/health` checks both the application and its database connection.
+- `deploy/shoveactually.service` runs the application with automatic restart.
+- `deploy/shoveactually-healthcheck.timer` records a health check in the system
+  journal every five minutes.
+- `deploy/shoveactually-backup.timer` creates and validates daily PostgreSQL dumps,
+  retaining 30 days in `/var/backups/turntable`.
+- `scripts/test-backup-restore.sh` restores the newest dump into a disposable
+  database, verifies core tables, and removes the disposable database.
 
 ## Top-level scripts
 
