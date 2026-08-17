@@ -10,6 +10,8 @@ set -Eeuo pipefail
 DB_PASSWORD="${DB_PASSWORD:-}"
 BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-}"
 CLOUDFLARE_TUNNEL_TOKEN="${CLOUDFLARE_TUNNEL_TOKEN:-}"
+RESEND_API_KEY="${RESEND_API_KEY:-}"
+RESEND_FROM_EMAIL="${RESEND_FROM_EMAIL:-}"
 
 # Optional configuration. The defaults normally do not need to be changed.
 DB_USER="turntable"
@@ -138,6 +140,9 @@ if [[ ! -f ${ENV_FILE} ]]; then
 DATABASE_URL=${DATABASE_URL}
 DATABASE_SSL=false
 BETTER_AUTH_SECRET=${EFFECTIVE_AUTH_SECRET}
+PUBLIC_SITE_URL=https://shoveactually.com
+RESEND_API_KEY=${RESEND_API_KEY}
+RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
 EOF
   chown "${APP_USER}:$(id -gn "${APP_USER}")" "${ENV_FILE}"
   chmod 600 "${ENV_FILE}"

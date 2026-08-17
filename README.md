@@ -117,6 +117,13 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - Public registration is always available until the database reaches its hard
   limit of 50 users. The database serializes concurrent signups so the limit
   cannot be exceeded.
+- Turn notification emails use Resend when `RESEND_API_KEY` and
+  `RESEND_FROM_EMAIL` are configured. Successful new games and completed moves
+  notify the next player with an idempotent link to the game; email failures do
+  not roll back game state.
+- When a game is won, only the losing player receives an idempotent result email
+  identifying the winner and linking directly to the finished game. Draws and
+  cancellations do not send result emails.
 - `GET /api/health` checks both the application and its database connection.
 - `deploy/shoveactually.service` runs the application with automatic restart.
 - `deploy/shoveactually-healthcheck.timer` records a health check in the system

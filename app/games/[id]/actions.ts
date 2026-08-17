@@ -9,6 +9,7 @@ import { Board, EMPTY_BOARD, isDraw, play, winner } from "@/lib/game";
 import { applyMove, emptyBoard as pfInitialBoard, MovePayload, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
 import { getMoveGameForPlayer, resignGameForPlayer } from "@/lib/game-repository";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type PlayerMark } from "@/lib/game-state";
+import { sendGameEndedEmail, sendTurnEmail } from "@/lib/turn-email";
 
 export async function resignGame(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -18,11 +19,14 @@ export async function resignGame(formData: FormData) {
   if (!gameId) redirect("/games");
 
   const client = await pool.connect();
+  let resigned = false;
   try {
-    await resignGameForPlayer(client, gameId, session.user.id);
+    resigned = await resignGameForPlayer(client, gameId, session.user.id);
   } finally {
     client.release();
   }
+
+  if (resigned) await sendGameEndedEmail(gameId, "resignation");
 
   revalidatePath(`/games/${gameId}`);
   revalidatePath("/games");
@@ -116,6 +120,12 @@ export async function makeMove(formData: FormData) {
           );
         }
         await client.query("COMMIT");
+        if (winningMark) {
+          await sendGameEndedEmail(gameId, `move-${moves.rows.length + 1}`);
+        } else if (!isDraw(nextBoard)) {
+          const nextPlayerId = players.rows.find((row) => row.user_id !== session.user.id)?.user_id;
+          if (nextPlayerId) await sendTurnEmail(gameId, nextPlayerId, `move-${moves.rows.length + 1}`);
+        }
       }
       revalidatePath(`/games/${gameId}`);
       revalidatePath("/games");
@@ -213,6 +223,16 @@ export async function makeMove(formData: FormData) {
           await client.query("UPDATE games SET updated_at = now() WHERE id = $1", [gameId]);
         }
         await client.query("COMMIT");
+        if (result.winner) {
+          await sendGameEndedEmail(gameId, `move-${moves.rows.length + 1}`);
+        } else {
+          const nextSummary = summarizeTurns([
+            ...moves.rows,
+            { player_id: session.user.id, payload: actionPayload },
+          ]);
+          const nextPlayer = currentPlayerId(game.game_type, playerX!, playerO!, nextSummary);
+          await sendTurnEmail(gameId, nextPlayer, `move-${moves.rows.length + 1}`);
+        }
       } catch (err) {
         await client.query("ROLLBACK");
         message = err instanceof Error ? err.message : "That action is not allowed.";

@@ -16,7 +16,8 @@
     "next": "^16.3.1",
     "pg": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "resend": "^6.20.0"
   },
   "devDependencies": {
     "@types/node": "latest",

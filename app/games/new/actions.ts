@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { createGameRecord } from "@/lib/game-repository";
 import type { GameType } from "@/lib/game-state";
+import { sendTurnEmail } from "@/lib/turn-email";
 
 export async function createGame(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -35,9 +36,16 @@ export async function createGame(formData: FormData) {
   }
 
   const client = await pool.connect();
+  let gameId = "";
+  let firstPlayerId = "";
   try {
     await client.query("BEGIN");
-    await createGameRecord(client, session.user.id, opponent.rows[0].id, gameType);
+    gameId = await createGameRecord(client, session.user.id, opponent.rows[0].id, gameType);
+    const firstPlayer = await client.query<{ user_id: string }>(
+      `SELECT user_id FROM game_players WHERE game_id = $1 AND mark = 'X'`,
+      [gameId],
+    );
+    firstPlayerId = firstPlayer.rows[0].user_id;
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -46,5 +54,6 @@ export async function createGame(formData: FormData) {
     client.release();
   }
 
+  await sendTurnEmail(gameId, firstPlayerId, "start");
   redirect("/games");
 }

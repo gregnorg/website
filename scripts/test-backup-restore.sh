@@ -12,10 +12,11 @@ APP_USER=${SUDO_USER:-$(stat -c '%U' "${WEBSITE_DIR}")}
 BACKUP_DIR=/var/backups/turntable
 RESTORE_DATABASE=turntable_restore_test
 
-set -a
-# This file is root-readable and contains the database connection URL.
-source "${WEBSITE_DIR}/.env.local"
-set +a
+DATABASE_URL=$(sed -n 's/^DATABASE_URL=//p' "${WEBSITE_DIR}/.env.local" | head -n 1)
+if [[ -z ${DATABASE_URL} ]]; then
+  echo "DATABASE_URL is missing from ${WEBSITE_DIR}/.env.local." >&2
+  exit 1
+fi
 
 LATEST_BACKUP=$(find "${BACKUP_DIR}" -maxdepth 1 -type f -name 'turntable-*.dump' -printf '%T@ %p\n' \
   | sort -nr \
