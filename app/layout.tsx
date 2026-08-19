@@ -47,16 +47,17 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <header>
           <Link className="brand" href="/">Shove Actually</Link>
           <nav>
-            <Link href="/leaderboard">Leaderboard</Link>
             {session ? (
               <>
                 <Link className="header-username" href="/account">{session.user.username}</Link>
                 <Link href="/games">Games</Link>
+                <Link href="/leaderboard">Leaderboard</Link>
                 {admin && <Link href="/admin">Admin</Link>}
                 <SignOutLink />
               </>
             ) : (
               <>
+                <Link href="/leaderboard">Leaderboard</Link>
                 <Link href="/login">Log in</Link>
                 <Link className="button small" href="/signup">Create account</Link>
               </>
