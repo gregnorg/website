@@ -51,6 +51,21 @@ export default async function GamesPage() {
       ORDER BY g.updated_at DESC`,
     [session.user.id],
   );
+  const games = result.rows
+    .map((game) => ({
+      ...game,
+      isPlayersTurn: game.status === "active" && currentPlayerId(
+        game.game_type,
+        game.x_player_id,
+        game.o_player_id,
+        {
+          moveCount: game.move_count,
+          setupMoveCount: game.setup_move_count,
+          lastTurnPlayerId: game.last_turn_player_id,
+        },
+      ) === session.user.id,
+    }))
+    .sort((a, b) => Number(b.isPlayersTurn) - Number(a.isPlayersTurn));
 
   return (
     <section className="page">
@@ -59,21 +74,9 @@ export default async function GamesPage() {
         <div><p className="kicker">Your games</p><h1>Games</h1></div>
         <Link className="button" href="/games/new">New game</Link>
       </div>
-      {result.rows.length ? (
+      {games.length ? (
         <div className="game-list">
-          {result.rows.map((game) => {
-            const turnPlayerId = currentPlayerId(
-              game.game_type,
-              game.x_player_id,
-              game.o_player_id,
-              {
-                moveCount: game.move_count,
-                setupMoveCount: game.setup_move_count,
-                lastTurnPlayerId: game.last_turn_player_id,
-              },
-            );
-            const isPlayersTurn = turnPlayerId === session.user.id;
-
+          {games.map((game) => {
             const isFinished = ["won", "draw", "cancelled"].includes(game.status);
 
             return <article className="game-card" key={game.id}>
@@ -97,7 +100,7 @@ export default async function GamesPage() {
                   <p>{game.game_type === "pushfight" ? "Pushfight" : "Tic-tac-toe"}</p>
                 </div>
                 <span className="status">
-                  {gameStatusLabel(game.status, game.winner_id, session.user.id, isPlayersTurn)}
+                  {gameStatusLabel(game.status, game.winner_id, session.user.id, game.isPlayersTurn)}
                 </span>
               </Link>
               {isFinished && (

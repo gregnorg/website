@@ -130,7 +130,7 @@ export async function makeMove(formData: FormData) {
       revalidatePath(`/games/${gameId}`);
       revalidatePath("/games");
       if (message) redirect(`/games/${gameId}?error=${encodeURIComponent(message)}`);
-      redirect(`/games/${gameId}`);
+      redirect(`/games/${gameId}?moved=1`);
       return;
     }
 
@@ -241,7 +241,7 @@ export async function makeMove(formData: FormData) {
     revalidatePath(`/games/${gameId}`);
     revalidatePath("/games");
     if (message) redirect(`/games/${gameId}?error=${encodeURIComponent(message)}`);
-    redirect(`/games/${gameId}`);
+    redirect(`/games/${gameId}?moved=1`);
     return;
   } catch (error) {
     await client.query("ROLLBACK");

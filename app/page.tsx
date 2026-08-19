@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PwaControls } from "@/components/pwa-controls";
 
 const pushfightPreview = [
   ["invalid", "invalid", "empty", "empty", "black-square", "empty", "empty", "invalid"],
@@ -15,6 +16,7 @@ export default function Home() {
         <Link className="button" href="/signup">Create an account</Link>
         <Link href="/login">Log in</Link>
       </div>
+      <PwaControls />
       <div className="home-pushfight" role="img" aria-label="Pushfight board with black and white pieces">
         {pushfightPreview.flatMap((row, rowIndex) => row.map((cell, colIndex) => (
           <span key={`${rowIndex}-${colIndex}`} className={`home-pf-cell${cell === "invalid" ? " home-pf-hole" : ""}`}>

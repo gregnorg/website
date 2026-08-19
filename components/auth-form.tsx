@@ -80,6 +80,7 @@ export function AuthForm({ mode, allowSignup = false }: { mode: "login" | "signu
             </button>
           </span>
         </label>
+        {!signup && <Link className="forgot-password-link" href="/forgot-password">Forgot password?</Link>}
         {error && <p className="error" role="alert">{error}</p>}
         <button className="button" disabled={busy}>{busy ? "Please wait…" : signup ? "Create account" : "Log in"}</button>
       </form>

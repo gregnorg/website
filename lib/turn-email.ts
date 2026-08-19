@@ -13,10 +13,6 @@ async function sendTurnEmailUnsafe(gameId: string, recipientId: string, turnKey:
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   const siteUrl = process.env.PUBLIC_SITE_URL ?? "https://shoveactually.com";
-  if (!apiKey || !from) {
-    console.warn("Turn email skipped: RESEND_API_KEY or RESEND_FROM_EMAIL is not configured.");
-    return;
-  }
 
   const result = await pool.query<{ email: string; username: string; opponent: string; game_type: string }>(
     `SELECT me.email, me.username, opponent.username AS opponent, g.game_type
@@ -25,7 +21,7 @@ async function sendTurnEmailUnsafe(gameId: string, recipientId: string, turnKey:
        JOIN "user" me ON me.id = mine.user_id
        JOIN game_players theirs ON theirs.game_id = g.id AND theirs.user_id <> mine.user_id
        JOIN "user" opponent ON opponent.id = theirs.user_id
-      WHERE g.id = $1 AND g.status = 'active'`,
+      WHERE g.id = $1 AND g.status = 'active' AND me.email_notifications = true`,
     [gameId, recipientId],
   );
   const recipient = result.rows[0];
@@ -33,6 +29,10 @@ async function sendTurnEmailUnsafe(gameId: string, recipientId: string, turnKey:
 
   const gameName = recipient.game_type === "pushfight" ? "Push Fight" : "Tic-tac-toe";
   const gameUrl = `${siteUrl.replace(/\/$/, "")}/games/${gameId}`;
+  if (!apiKey || !from) {
+    console.warn("Turn email skipped: RESEND_API_KEY or RESEND_FROM_EMAIL is not configured.");
+    return;
+  }
   try {
     const resend = new Resend(apiKey);
     const response = await resend.emails.send(
@@ -63,10 +63,6 @@ async function sendGameEndedEmailUnsafe(gameId: string, eventKey: string) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   const siteUrl = process.env.PUBLIC_SITE_URL ?? "https://shoveactually.com";
-  if (!apiKey || !from) {
-    console.warn("Game-ended email skipped: RESEND_API_KEY or RESEND_FROM_EMAIL is not configured.");
-    return;
-  }
 
   const result = await pool.query<{
     user_id: string;
@@ -84,16 +80,21 @@ async function sendGameEndedEmailUnsafe(gameId: string, eventKey: string) {
        JOIN "user" me ON me.id = mine.user_id
        JOIN game_players theirs ON theirs.game_id = g.id AND theirs.user_id <> mine.user_id
        JOIN "user" opponent ON opponent.id = theirs.user_id
-      WHERE g.id = $1 AND g.status = 'won' AND mine.user_id <> g.winner_id`,
+      WHERE g.id = $1 AND g.status = 'won' AND mine.user_id <> g.winner_id
+        AND me.email_notifications = true`,
     [gameId],
   );
   if (result.rows.length === 0) return;
 
-  const resend = new Resend(apiKey);
+  const resend = apiKey && from ? new Resend(apiKey) : null;
   const gameUrl = `${siteUrl.replace(/\/$/, "")}/games/${gameId}`;
   for (const recipient of result.rows) {
     const gameName = recipient.game_type === "pushfight" ? "Push Fight" : "Tic-tac-toe";
     const outcome = `${recipient.opponent} won.`;
+    if (!resend || !from) {
+      console.warn("Game-ended email skipped: RESEND_API_KEY or RESEND_FROM_EMAIL is not configured.");
+      continue;
+    }
     try {
       const response = await resend.emails.send(
         {

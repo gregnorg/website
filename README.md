@@ -59,7 +59,8 @@ Then set up the application:
 6. Run `psql "$DATABASE_URL" -f database/schema.sql` after exporting the URL,
    or pass the URL from `.env.local` directly to `psql`.
 7. Run `npm run migrate` to apply any migrations added after the base schema.
-8. Run `npm run dev` and open `http://localhost:3000` in Windows.
+8. Run `npm run setup:push` once to generate browser-notification signing keys.
+9. Run `npm run dev` and open `http://localhost:3000` in Windows.
 
 The local connection should resemble:
 
@@ -110,6 +111,7 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - `npm run lint` — lint checks
 - `npm run build` — production build
 - `npm run migrate` — apply pending database migrations
+- `npm run setup:push` — generate VAPID keys in `.env.local` if they are missing
 - `npm start` — production server on loopback for the local reverse proxy/tunnel
 
 ## Production operations
@@ -121,6 +123,9 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
   `RESEND_FROM_EMAIL` are configured. Successful new games and completed moves
   notify the next player with an idempotent link to the game; email failures do
   not roll back game state.
+- Installed devices can opt into web push from the home page. The same events
+  that trigger turn and game-result emails trigger browser notifications;
+  notification failures never roll back game state. Gameplay remains online-only.
 - When a game is won, only the losing player receives an idempotent result email
   identifying the winner and linking directly to the finished game. Draws and
   cancellations do not send result emails.

@@ -8,6 +8,7 @@ import { makeMove, resignGame } from "./actions";
 import PushfightBoard from "@/components/pushfight-board";
 import { applyMove, emptyBoard, movesSinceLastPush } from "@/lib/pushfight";
 import type { MovePayload } from "@/lib/pushfight";
+import { ConfirmResignButton } from "@/components/confirm-resign-button";
 import {
   currentPlayerId as getCurrentPlayerId,
   isSetupPhase,
@@ -26,12 +27,12 @@ export default async function GamePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; moved?: string }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, moved } = await searchParams;
 
   const gameResult = await pool.query<{
     status: GameStatus;
@@ -88,6 +89,48 @@ export default async function GamePage({
   const movesThisTurn = movesSinceLastPush(moves.rows);
   const canMove = game.status === "active" && currentPlayerId === session.user.id;
 
+  let nextTurnGameId: string | null = null;
+  if (moved === "1") {
+    const candidates = await pool.query<{
+      id: string;
+      game_type: GameType;
+      x_player_id: string;
+      o_player_id: string;
+      move_count: number;
+      setup_move_count: number;
+      last_turn_player_id: string | null;
+    }>(
+      `SELECT g.id, g.game_type,
+              xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id,
+              COUNT(m.id)::int AS move_count,
+              COUNT(m.id) FILTER (WHERE m.payload->>'type' = 'setup')::int AS setup_move_count,
+              (ARRAY_AGG(m.player_id ORDER BY m.move_number DESC)
+                FILTER (WHERE m.payload->>'type' IN ('push', 'turn')))[1] AS last_turn_player_id
+         FROM games g
+         JOIN game_players me
+           ON me.game_id = g.id AND me.user_id = $1
+         JOIN game_players xplayer
+           ON xplayer.game_id = g.id AND xplayer.mark = 'X'
+         JOIN game_players oplayer
+           ON oplayer.game_id = g.id AND oplayer.mark = 'O'
+         LEFT JOIN moves m ON m.game_id = g.id
+        WHERE g.status = 'active' AND me.cleared_at IS NULL AND g.id <> $2
+        GROUP BY g.id, xplayer.user_id, oplayer.user_id
+        ORDER BY g.updated_at DESC`,
+      [session.user.id, id],
+    );
+    nextTurnGameId = candidates.rows.find((candidate) => getCurrentPlayerId(
+      candidate.game_type,
+      candidate.x_player_id,
+      candidate.o_player_id,
+      {
+        moveCount: candidate.move_count,
+        setupMoveCount: candidate.setup_move_count,
+        lastTurnPlayerId: candidate.last_turn_player_id,
+      },
+    ) === session.user.id)?.id ?? null;
+  }
+
   let summary = `Waiting for ${game.opponent_username} to move.`;
   if (setupStage) {
     const teamName = turnSummary.setupMoveCount === 0 ? "White" : "Black";
@@ -112,6 +155,12 @@ export default async function GamePage({
     <section className="game-page">
       <RefreshOnReturn />
       <Link className="back-link" href="/games">← All games</Link>
+      {moved === "1" && (
+        <div className="after-move" role="status">
+          <span>Move submitted.</span>
+          {nextTurnGameId ? <Link href={`/games/${nextTurnGameId}`}>Play your next game →</Link> : <Link href="/games">View all games</Link>}
+        </div>
+      )}
       <h1 aria-label={`${session.user.username} versus ${game.opponent_username}`}>
         <span
           className={game.my_mark === "X" ? "player-white" : "player-black"}
@@ -187,7 +236,7 @@ export default async function GamePage({
       {game.status === "active" && (
         <form action={resignGame} className="resign-form">
           <input type="hidden" name="gameId" value={id} />
-          <button className="resign-button" type="submit">Resign game</button>
+          <ConfirmResignButton />
         </form>
       )}
     </section>

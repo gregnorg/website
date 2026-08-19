@@ -5,7 +5,9 @@ a { color:inherit; }
 header { height:68px; padding:0 max(24px, calc((100% - 960px)/2)); display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); background:var(--white); }
 .brand { font-size:19px; font-weight:700; text-decoration:none; }
 nav { display:flex; align-items:center; gap:22px; }
-.header-username { font-weight:700; text-decoration:none; }
+.games-link { display:inline-flex; align-items:center; gap:6px; }
+.notification-badge { min-width:19px; height:19px; padding:0 5px; display:inline-grid; place-items:center; border-radius:999px; color:#fff; background:#d62828; font-size:12px; font-weight:700; line-height:1; text-decoration:none; }
+.header-username { padding-bottom:1px; border-bottom:2px solid currentColor; font-weight:700; text-decoration:none; }
 .signout-link { padding:0; border:0; color:inherit; background:transparent; font:inherit; text-decoration:underline; cursor:pointer; }
 .signout-link:disabled { color:var(--muted); cursor:wait; }
 main { min-height:calc(100vh - 68px); }
@@ -18,7 +20,11 @@ h1 { margin-bottom:16px; font-size:clamp(34px, 6vw, 58px); line-height:1.08; let
 .actions { margin:32px 0 50px; display:flex; justify-content:center; align-items:center; gap:24px; }
 .button { display:inline-block; padding:11px 17px; color:white; border:0; border-radius:4px; background:var(--accent); font:inherit; font-weight:700; text-decoration:none; cursor:pointer; }
 .button.small { padding:7px 12px; font-size:14px; }
+.button.secondary { color:var(--accent); border:1px solid var(--accent); background:var(--white); }
 .button:disabled { opacity:.6; cursor:wait; }
+.pwa-controls { margin:-24px 0 38px; display:flex; justify-content:center; align-items:start; gap:12px; }
+.pwa-controls > div { max-width:260px; }
+.pwa-message { margin:8px 0 0; color:var(--muted); font-size:13px; }
 .home-pushfight { width:min(520px, 100%); margin:auto; padding:22px; display:grid; grid-template-columns:repeat(8, 1fr); border:10px solid #17130f; border-radius:30px; background:linear-gradient(180deg, #c9924e 0%, #98682f 100%); box-shadow:0 20px 48px rgba(0,0,0,.25); }
 .home-pf-cell { aspect-ratio:1; display:grid; place-items:center; border:1.7px solid #12100d; border-radius:9px; background:#f0d095; box-shadow:inset 0 0 0 1px rgba(255,255,255,.24); }
 .home-pf-hole { border:0; background:transparent; box-shadow:none; }
@@ -34,11 +40,15 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .password-field input { padding-right:65px; }
 .password-toggle { position:absolute; top:50%; right:10px; padding:4px; border:0; color:var(--accent); background:transparent; font:inherit; font-size:13px; font-weight:700; cursor:pointer; transform:translateY(-50%); }
 .password-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.forgot-password-link { justify-self:end; margin-top:-10px; font-size:14px; }
 .error { margin:0; color:#a12d25; font-size:14px; }
 .success { margin:0; color:var(--accent); font-size:14px; font-weight:700; }
 .account-panel { width:min(480px, calc(100% - 32px)); }
 .account-panel h2 { margin:28px 0 6px; font-size:22px; }
 .account-panel h2 + p { margin-bottom:0; }
+.account-setting-success { margin-top:14px; }
+.notification-settings-form { margin-top:18px; }
+.notification-settings-form .button { justify-self:start; }
 .checkbox-label { grid-template-columns:auto 1fr; align-items:center; justify-content:start; font-weight:400; }
 .checkbox-label input { width:auto; }
 .admin-page h2 { margin:42px 0 14px; }
@@ -75,6 +85,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .game-page { width:min(520px, calc(100% - 40px)); margin:auto; padding:42px 0 64px; text-align:center; }
 .game-page h1 { margin-bottom:8px; font-size:38px; }
 .back-link { display:block; margin-bottom:38px; text-align:left; }
+.after-move { margin:-20px 0 28px; padding:12px 14px; display:flex; justify-content:space-between; gap:16px; border:1px solid #b9d3c5; border-radius:4px; color:var(--accent); background:#e5eee9; font-weight:700; text-align:left; }
 .game-summary { margin-bottom:24px; color:var(--muted); font-size:18px; }
 .game-error { margin-bottom:18px; }
 .game-board { display:grid; grid-template-columns:repeat(3, 1fr); border:1px solid var(--ink); background:var(--white); }
@@ -195,4 +206,4 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
   .pf-result-overlay { inset:4px; border-radius:7px; font-size:clamp(34px, 12vw, 48px); }
   .pushfight-controls .form-actions { gap:8px; }
 }
-@media(max-width:520px){ header { padding:0 16px; } nav { gap:12px; } .hero { padding-top:60px; } .page-heading { align-items:start; gap:20px; } }
+@media(max-width:520px){ header { padding:0 16px; } nav { gap:12px; } .hero { padding-top:60px; } .page-heading { align-items:start; gap:20px; } .pwa-controls { align-items:stretch; flex-direction:column; } .pwa-controls > div, .pwa-controls .button { width:100%; max-width:none; } }

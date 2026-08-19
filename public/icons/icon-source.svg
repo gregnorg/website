@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c9924e"/>
+      <stop offset="1" stop-color="#98682f"/>
+    </linearGradient>
+    <linearGradient id="whitePiece" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#fffaf0"/>
+      <stop offset="1" stop-color="#e8dcc2"/>
+    </linearGradient>
+    <linearGradient id="blackPiece" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#333"/>
+      <stop offset="1" stop-color="#080808"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-opacity=".35"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="#295b45"/>
+  <rect x="76" y="246" width="872" height="532" rx="64" fill="#17130f" filter="url(#shadow)"/>
+  <rect x="96" y="266" width="832" height="492" rx="43" fill="url(#wood)"/>
+
+  <!-- Homepage board cells: 8 columns by 4 rows. -->
+  <g fill="#f0d095" stroke="#12100d" stroke-width="5">
+    <!-- row 1: holes at columns 1 and 2 -->
+    <rect x="315" y="291" width="94" height="94" rx="16"/><rect x="415" y="291" width="94" height="94" rx="16"/>
+    <rect x="515" y="291" width="94" height="94" rx="16"/><rect x="615" y="291" width="94" height="94" rx="16"/>
+    <rect x="715" y="291" width="94" height="94" rx="16"/><rect x="815" y="291" width="94" height="94" rx="16"/>
+    <!-- row 2 -->
+    <rect x="115" y="397" width="94" height="94" rx="16"/><rect x="215" y="397" width="94" height="94" rx="16"/>
+    <rect x="315" y="397" width="94" height="94" rx="16"/><rect x="415" y="397" width="94" height="94" rx="16"/>
+    <rect x="515" y="397" width="94" height="94" rx="16"/><rect x="615" y="397" width="94" height="94" rx="16"/>
+    <rect x="715" y="397" width="94" height="94" rx="16"/><rect x="815" y="397" width="94" height="94" rx="16"/>
+    <!-- row 3 -->
+    <rect x="115" y="503" width="94" height="94" rx="16"/><rect x="215" y="503" width="94" height="94" rx="16"/>
+    <rect x="315" y="503" width="94" height="94" rx="16"/><rect x="415" y="503" width="94" height="94" rx="16"/>
+    <rect x="515" y="503" width="94" height="94" rx="16"/><rect x="615" y="503" width="94" height="94" rx="16"/>
+    <rect x="715" y="503" width="94" height="94" rx="16"/><rect x="815" y="503" width="94" height="94" rx="16"/>
+    <!-- row 4: holes at columns 1, 7, and 8 -->
+    <rect x="215" y="609" width="94" height="94" rx="16"/><rect x="315" y="609" width="94" height="94" rx="16"/>
+    <rect x="415" y="609" width="94" height="94" rx="16"/><rect x="515" y="609" width="94" height="94" rx="16"/>
+    <rect x="615" y="609" width="94" height="94" rx="16"/>
+  </g>
+
+  <!-- Pieces from the homepage preview. -->
+  <g stroke="#4d3d25" stroke-width="7" filter="url(#shadow)">
+    <rect x="325" y="407" width="74" height="74" rx="17" fill="url(#whitePiece)"/>
+    <circle cx="462" cy="444" r="35" fill="url(#whitePiece)"/>
+    <circle cx="462" cy="550" r="35" fill="url(#whitePiece)"/>
+    <rect x="525" y="407" width="74" height="74" rx="17" fill="url(#whitePiece)"/>
+    <rect x="425" y="619" width="74" height="74" rx="17" fill="url(#whitePiece)"/>
+  </g>
+  <g stroke="#f8f1e5" stroke-width="7" filter="url(#shadow)">
+    <circle cx="662" cy="444" r="35" fill="url(#blackPiece)"/>
+    <circle cx="562" cy="550" r="35" fill="url(#blackPiece)"/>
+    <rect x="825" y="513" width="74" height="74" rx="17" fill="url(#blackPiece)"/>
+    <rect x="525" y="619" width="74" height="74" rx="17" fill="url(#blackPiece)"/>
+  </g>
+  <!-- Red anchor on the homepage's white piece. -->
+  <rect x="341" y="423" width="42" height="42" rx="8" fill="#d8493e" stroke="#731b16" stroke-width="6"/>
+</svg>

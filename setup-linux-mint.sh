@@ -161,6 +161,7 @@ sudo -u "${APP_USER}" -H env \
     source "$NVM_DIR/nvm.sh"
     cd "$WEBSITE_DIR"
     npm ci
+    npm run setup:push
     npx auth@latest migrate --yes
     if [[ $(psql "$DATABASE_URL" -tAc "SELECT to_regclass('"'"'public.games'"'"') IS NOT NULL") != "t" ]]; then
       psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/schema.sql
