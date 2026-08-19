@@ -40,3 +40,13 @@ export async function POST(request: Request) {
   );
   return NextResponse.json({ ok: true });
 }
+
+export async function DELETE(request: Request) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const input = await request.json().catch(() => ({})) as { endpoint?: unknown };
+  const endpoint = typeof input.endpoint === "string" ? input.endpoint : "";
+  if (!endpoint) return NextResponse.json({ error: "Invalid subscription." }, { status: 400 });
+  await pool.query("DELETE FROM push_subscriptions WHERE endpoint = $1 AND user_id = $2", [endpoint, session.user.id]);
+  return NextResponse.json({ ok: true });
+}

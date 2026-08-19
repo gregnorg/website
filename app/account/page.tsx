@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import { ChangeUsernameForm } from "@/components/change-username-form";
+import { AppIconAlerts } from "@/components/app-icon-alerts";
 import { pool } from "@/lib/db";
 import { updateEmailNotifications } from "./actions";
 
@@ -26,6 +27,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <p>Choose the name other players see. Use 3–24 letters, numbers, or underscores.</p>
       <ChangeUsernameForm currentUsername={session.user.username ?? ""} />
       {usernameChanged && <p className="success account-setting-success" role="status">Username changed.</p>}
+      <h2>App icon alerts</h2>
+      <p>Show when a game is waiting for your move. Requires the installed app and notification permission.</p>
+      <AppIconAlerts />
       <h2>Email notifications</h2>
       <p>Receive an email when a game is waiting for your move or when an opponent wins.</p>
       <form action={updateEmailNotifications} className="notification-settings-form">

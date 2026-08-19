@@ -6,6 +6,7 @@ type PushPayload = {
   body: string;
   url: string;
   tag: string;
+  badgeCount?: number;
 };
 
 function configureWebPush() {

@@ -1,4 +1,4 @@
-const CACHE = "shove-actually-shell-v1";
+const CACHE = "shove-actually-shell-v2";
 const SHELL = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -35,14 +35,36 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("push", (event) => {
   const data = event.data?.json() ?? {};
-  event.waitUntil(self.registration.showNotification(data.title ?? "Shove Actually", {
-    body: data.body ?? "There is an update to one of your games.",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
-    data: { url: data.url ?? "/games" },
-    tag: data.tag,
-    renotify: Boolean(data.tag),
-  }));
+  const work = [];
+  if ("setAppBadge" in self.navigator && Number.isFinite(data.badgeCount)) {
+    work.push(data.badgeCount > 0
+      ? self.navigator.setAppBadge(data.badgeCount)
+      : self.navigator.clearAppBadge());
+  }
+  work.push(self.registration.showNotification(data.title ?? "Shove Actually", {
+      body: data.body ?? "There is an update to one of your games.",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: data.url ?? "/games" },
+      tag: data.tag,
+      renotify: Boolean(data.tag),
+    }));
+  event.waitUntil(Promise.all(work));
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "TURN_BADGE_COUNT") return;
+  const count = Number(event.data.count) || 0;
+  const work = [];
+  if ("setAppBadge" in self.navigator) {
+    work.push(count > 0 ? self.navigator.setAppBadge(count) : self.navigator.clearAppBadge());
+  }
+  if (count === 0) {
+    work.push(self.registration.getNotifications({ tag: event.data.tag }).then((notifications) => {
+      notifications.forEach((notification) => notification.close());
+    }));
+  }
+  event.waitUntil(Promise.all(work));
 });
 
 self.addEventListener("notificationclick", (event) => {
