@@ -74,7 +74,8 @@ export async function resignGameForPlayer(
 ): Promise<boolean> {
   const result = await client.query(
     `UPDATE games AS g
-        SET status = 'won', winner_id = opponent.user_id, updated_at = now()
+        SET status = 'won', winner_id = opponent.user_id,
+            resigned_by_id = me.user_id, updated_at = now()
        FROM game_players AS me
        JOIN game_players AS opponent
          ON opponent.game_id = me.game_id AND opponent.user_id <> me.user_id

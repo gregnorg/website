@@ -20,10 +20,6 @@ export default async function Home() {
   return (
     <section className="center hero">
       <h1>It’s okay to be pushy.</h1>
-      <div className="actions">
-        <Link className="button" href="/signup">Create an account</Link>
-        <Link href="/login">Log in</Link>
-      </div>
       <PwaControls />
       <section className="home-leaders" aria-labelledby="home-leaders-title">
         <div className="home-leaders-heading">

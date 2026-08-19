@@ -6,6 +6,7 @@ import { SignOutLink } from "@/components/sign-out-link";
 import { isAdmin } from "@/lib/admin";
 import { PwaRegistration } from "@/components/pwa-registration";
 import { AppIconBadge } from "@/components/app-icon-badge";
+import { AppIconAlertPrompt } from "@/components/app-icon-alert-prompt";
 import { gamesWaitingForMove } from "@/lib/turn-count";
 import "./globals.css";
 
@@ -44,6 +45,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body>
         <PwaRegistration />
         <AppIconBadge initialCount={turnCount} />
+        {session && <AppIconAlertPrompt />}
         <header>
           <Link className="brand" href="/">Shove Actually</Link>
           <nav>

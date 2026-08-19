@@ -6,8 +6,8 @@ import { pool } from "@/lib/db";
 import { Board, EMPTY_BOARD } from "@/lib/game";
 import { makeMove, resignGame } from "./actions";
 import PushfightBoard from "@/components/pushfight-board";
-import { applyMove, emptyBoard, movesSinceLastPush } from "@/lib/pushfight";
-import type { MovePayload } from "@/lib/pushfight";
+import { applyMove, emptyBoard, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
+import { TicTacToeBoard } from "@/components/tic-tac-toe-board";
 import { ConfirmResignButton } from "@/components/confirm-resign-button";
 import {
   currentPlayerId as getCurrentPlayerId,
@@ -37,6 +37,7 @@ export default async function GamePage({
   const gameResult = await pool.query<{
     status: GameStatus;
     winner_id: string | null;
+    resigned_by_id: string | null;
     game_type: GameType;
     my_mark: PlayerMark;
     opponent_username: string;
@@ -44,7 +45,7 @@ export default async function GamePage({
     x_player_id: string;
     o_player_id: string;
   }>(
-    `SELECT g.status, g.winner_id, g.game_type, me.mark AS my_mark,
+    `SELECT g.status, g.winner_id, g.resigned_by_id, g.game_type, me.mark AS my_mark,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id
        FROM games g
@@ -88,6 +89,36 @@ export default async function GamePage({
   const currentPlayerId = getCurrentPlayerId(game.game_type, xPlayerId, oPlayerId, turnSummary);
   const movesThisTurn = movesSinceLastPush(moves.rows);
   const canMove = game.status === "active" && currentPlayerId === session.user.id;
+  const replayEnabled = game.status !== "active" || currentPlayerId !== game.opponent_id;
+  const lastOpponentMoveIndex = moves.rows.findLastIndex((move) => move.player_id === game.opponent_id);
+  const ticTacToeReplayPosition = isTicTacToe && lastOpponentMoveIndex >= 0
+    ? moves.rows[lastOpponentMoveIndex].position
+    : null;
+
+  let pushfightBoard = emptyBoard();
+  const pushfightReplayBoards: ReturnType<typeof emptyBoard>[] = [];
+  if (!isTicTacToe) {
+    for (let index = 0; index < moves.rows.length; index += 1) {
+      const move = moves.rows[index];
+      if (!move.payload) continue;
+      try {
+        const payload = normalizeMovePayload(move.payload);
+        const moverColor = move.player_id === xPlayerId ? "white" : "black";
+        if (index === lastOpponentMoveIndex) {
+          pushfightReplayBoards.push(pushfightBoard);
+          const actions = payload.type === "turn" ? payload.actions : [payload];
+          let replayFrame = pushfightBoard;
+          for (const replayAction of actions) {
+            replayFrame = applyMove(replayFrame, replayAction, moverColor).board;
+            pushfightReplayBoards.push(replayFrame);
+          }
+        }
+        pushfightBoard = applyMove(pushfightBoard, payload, moverColor).board;
+      } catch {
+        // Ignore invalid historical moves for display and replay.
+      }
+    }
+  }
 
   let nextTurnGameId: string | null = null;
   if (moved === "1") {
@@ -144,9 +175,15 @@ export default async function GamePage({
   }
   if (game.status === "draw") summary = "Draw.";
   if (game.status === "won") {
-    summary = game.winner_id === session.user.id
-      ? "You won!"
-      : `${game.opponent_username} won.`;
+    if (game.resigned_by_id === game.opponent_id) {
+      summary = `${game.opponent_username} resigned. You won!`;
+    } else if (game.resigned_by_id === session.user.id) {
+      summary = `You resigned. ${game.opponent_username} won.`;
+    } else {
+      summary = game.winner_id === session.user.id
+        ? "You won!"
+        : `${game.opponent_username} won.`;
+    }
   }
 
   const moveAction = makeMove;
@@ -181,41 +218,20 @@ export default async function GamePage({
           <p className="game-summary">{summary}</p>
           {error && <p className="error game-error" role="alert">{error}</p>}
           <p className="kicker">Tic-tac-toe</p>
-          <div className="game-board" aria-label="Tic-tac-toe board">
-            {board.map((cell, position) => (
-              <form action={moveAction} key={position}>
-                <input type="hidden" name="gameId" value={id} />
-                <input type="hidden" name="position" value={position} />
-                <button
-                  className="game-square"
-                  type="submit"
-                  aria-label={cell ? `Square ${position + 1}: ${cell}` : `Play square ${position + 1}`}
-                  disabled={Boolean(cell) || !canMove}
-                >
-                  {cell}
-                </button>
-              </form>
-            ))}
-          </div>
+          <TicTacToeBoard
+            board={board}
+            replayPosition={ticTacToeReplayPosition}
+            replayEnabled={replayEnabled}
+            gameId={id}
+            canMove={canMove}
+            action={moveAction}
+          />
         </>
       ) : (
         <>
-          <p className="kicker">Pushfight (simplified)</p>
           <PushfightBoard
             key={moves.rows.length}
-            board={(() => {
-              let pfBoard = emptyBoard();
-              for (const move of moves.rows) {
-                if (!move.payload) continue;
-                try {
-                  const moverColor = move.player_id === xPlayerId ? "white" : "black";
-                  pfBoard = applyMove(pfBoard, move.payload as MovePayload, moverColor).board;
-                } catch {
-                  // ignore invalid historical moves for display
-                }
-              }
-              return pfBoard;
-            })()}
+            board={pushfightBoard}
             gameId={id}
             myId={session.user.id}
             currentPlayerId={currentPlayerId}
@@ -230,6 +246,8 @@ export default async function GamePage({
             statusMessage={summary}
             errorMessage={error}
             gameOutcome={game.status === "won" ? (game.winner_id === session.user.id ? "win" : "loss") : null}
+            replayBoards={pushfightReplayBoards}
+            replayEnabled={replayEnabled}
           />
         </>
       )}

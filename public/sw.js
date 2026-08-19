@@ -49,7 +49,9 @@ self.addEventListener("push", (event) => {
       tag: data.tag,
       renotify: Boolean(data.tag),
     }));
-  event.waitUntil(Promise.all(work));
+  // Android derives its app-icon dot from the visible notification. A badge API
+  // failure must never prevent that notification from being displayed.
+  event.waitUntil(Promise.allSettled(work));
 });
 
 self.addEventListener("message", (event) => {
@@ -64,7 +66,7 @@ self.addEventListener("message", (event) => {
       notifications.forEach((notification) => notification.close());
     }));
   }
-  event.waitUntil(Promise.all(work));
+  event.waitUntil(Promise.allSettled(work));
 });
 
 self.addEventListener("notificationclick", (event) => {

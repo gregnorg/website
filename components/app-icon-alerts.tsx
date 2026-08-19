@@ -21,7 +21,19 @@ export function AppIconAlerts() {
     }
     navigator.serviceWorker.ready
       .then((registration) => registration.pushManager.getSubscription())
-      .then((subscription) => setEnabled(Boolean(subscription)))
+      .then(async (subscription) => {
+        if (!subscription) {
+          setEnabled(false);
+          return;
+        }
+
+        // A browser subscription can outlive its database row (for example after
+        // a restore). Re-register it whenever account settings are opened so the
+        // UI cannot say alerts are on while the server has nowhere to send them.
+        const response = await saveSubscription(subscription);
+        if (!response.ok) throw new Error("Could not restore app icon alerts.");
+        setEnabled(true);
+      })
       .catch(() => setSupported(false));
   }, []);
 
@@ -55,11 +67,7 @@ export function AppIconAlerts() {
         userVisibleOnly: true,
         applicationServerKey: decodeBase64Url(publicKey),
       });
-      const response = await fetch("/api/push/subscriptions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(subscription),
-      });
+      const response = await saveSubscription(subscription);
       if (!response.ok) throw new Error("Could not enable app icon alerts.");
       setEnabled(true);
       setMessage("App icon alerts are on for this device.");
@@ -80,4 +88,12 @@ export function AppIconAlerts() {
       {message && <p className="pwa-message" role="status">{message}</p>}
     </div>
   );
+}
+
+function saveSubscription(subscription: PushSubscription) {
+  return fetch("/api/push/subscriptions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(subscription),
+  });
 }

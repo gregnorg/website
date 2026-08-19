@@ -17,6 +17,7 @@ export default async function GamesPage() {
     id: string;
     status: GameStatus;
     winner_id: string | null;
+    resigned_by_id: string | null;
     game_type: GameType;
     my_mark: PlayerMark;
     x_player_id: string;
@@ -25,10 +26,11 @@ export default async function GamesPage() {
     setup_move_count: number;
     last_turn_player_id: string | null;
     opponent_username: string;
+    opponent_id: string;
   }>(
-    `SELECT g.id, g.status, g.winner_id, g.game_type, me.mark AS my_mark,
+    `SELECT g.id, g.status, g.winner_id, g.resigned_by_id, g.game_type, me.mark AS my_mark,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id,
-            opponent.username AS opponent_username,
+            opponent.username AS opponent_username, opponent.id AS opponent_id,
             COUNT(m.id)::int AS move_count,
             COUNT(m.id) FILTER (WHERE m.payload->>'type' = 'setup')::int AS setup_move_count,
             (ARRAY_AGG(m.player_id ORDER BY m.move_number DESC)
@@ -47,7 +49,7 @@ export default async function GamesPage() {
        LEFT JOIN moves m
          ON m.game_id = g.id
       WHERE me.cleared_at IS NULL
-      GROUP BY g.id, me.mark, xplayer.user_id, oplayer.user_id, opponent.username
+      GROUP BY g.id, me.mark, xplayer.user_id, oplayer.user_id, opponent.id, opponent.username
       ORDER BY g.updated_at DESC`,
     [session.user.id],
   );
@@ -100,7 +102,11 @@ export default async function GamesPage() {
                   <p>{game.game_type === "pushfight" ? "Pushfight" : "Tic-tac-toe"}</p>
                 </div>
                 <span className="status">
-                  {gameStatusLabel(game.status, game.winner_id, session.user.id, game.isPlayersTurn)}
+                  {game.resigned_by_id === game.opponent_id
+                    ? "Opponent resigned"
+                    : game.resigned_by_id === session.user.id
+                      ? "You resigned"
+                      : gameStatusLabel(game.status, game.winner_id, session.user.id, game.isPlayersTurn)}
                 </span>
               </Link>
               {isFinished && (

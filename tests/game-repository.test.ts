@@ -75,11 +75,11 @@ test("game database operations enforce membership and finished-game clearing", a
   );
   assert.equal(await resignGameForPlayer(client, resignationGameId, outsiderId), false);
   assert.equal(await resignGameForPlayer(client, resignationGameId, opponentId), true);
-  const resignedGame = await client.query<{ status: string; winner_id: string | null }>(
-    "SELECT status, winner_id FROM games WHERE id = $1",
+  const resignedGame = await client.query<{ status: string; winner_id: string | null; resigned_by_id: string | null }>(
+    "SELECT status, winner_id, resigned_by_id FROM games WHERE id = $1",
     [resignationGameId],
   );
-  assert.deepEqual(resignedGame.rows[0], { status: "won", winner_id: creatorId });
+  assert.deepEqual(resignedGame.rows[0], { status: "won", winner_id: creatorId, resigned_by_id: opponentId });
   const champion = await client.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true");
   assert.equal(champion.rows[0].user_id, creatorId);
   assert.equal(await resignGameForPlayer(client, resignationGameId, opponentId), false);

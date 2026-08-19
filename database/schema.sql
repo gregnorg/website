@@ -14,6 +14,7 @@ CREATE TABLE games (
   status game_status NOT NULL DEFAULT 'waiting',
   game_type game_type NOT NULL DEFAULT 'tic_tac_toe',
   winner_id TEXT REFERENCES "user"(id),
+  resigned_by_id TEXT REFERENCES "user"(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

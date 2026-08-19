@@ -9,27 +9,32 @@ interface BeforeInstallPromptEvent extends Event {
 
 export function PwaControls() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
+  const [eligible, setEligible] = useState(false);
   const [installMessage, setInstallMessage] = useState("");
 
   useEffect(() => {
-    const statusTimer = window.setTimeout(() => {
-      setInstalled(window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
-    }, 0);
+    const appNavigator = navigator as Navigator & {
+      standalone?: boolean;
+      userAgentData?: { mobile?: boolean };
+    };
+    const installed = window.matchMedia("(display-mode: standalone)").matches || Boolean(appNavigator.standalone);
+    const mobile = appNavigator.userAgentData?.mobile
+      ?? (/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent)
+        || (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
+    const eligibilityTimer = window.setTimeout(() => setEligible(mobile && !installed), 0);
 
     const handlePrompt = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
     };
     const handleInstalled = () => {
-      setInstalled(true);
+      setEligible(false);
       setInstallPrompt(null);
-      setInstallMessage("Installed.");
     };
     window.addEventListener("beforeinstallprompt", handlePrompt);
     window.addEventListener("appinstalled", handleInstalled);
     return () => {
-      window.clearTimeout(statusTimer);
+      window.clearTimeout(eligibilityTimer);
       window.removeEventListener("beforeinstallprompt", handlePrompt);
       window.removeEventListener("appinstalled", handleInstalled);
     };
@@ -48,11 +53,13 @@ export function PwaControls() {
       : "Use your browser menu and choose Install app or Add to Home screen.");
   }
 
+  if (!eligible) return null;
+
   return (
     <div className="pwa-controls">
       <div>
-        <button className="button" type="button" onClick={install} disabled={installed}>
-          {installed ? "App installed" : "Install app"}
+        <button className="button" type="button" onClick={install}>
+          Install app
         </button>
         {installMessage && <p className="pwa-message" role="status">{installMessage}</p>}
       </div>

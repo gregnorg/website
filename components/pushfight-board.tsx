@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Board, Coord, PushfightCell, MovePayload, TurnAction } from "@/lib/pushfight";
 import { applyMove, isValidCoord } from "@/lib/pushfight";
 
@@ -20,6 +20,8 @@ type Props = {
   statusMessage: string;
   errorMessage?: string;
   gameOutcome: "win" | "loss" | null;
+  replayBoards?: Board[];
+  replayEnabled?: boolean;
 };
 
 type LegalTarget = { coord: Coord; action: TurnAction; board: Board; winner?: "white" | "black" };
@@ -110,6 +112,8 @@ export default function PushfightBoard({
   isSetupPhase,
   setupTeam,
   gameOutcome,
+  replayBoards = [],
+  replayEnabled = true,
 }: Props) {
   const [selectedPiece, setSelectedPiece] = useState<Coord | null>(null);
   const [setupSelection, setSetupSelection] = useState<Coord[]>([]);
@@ -117,7 +121,12 @@ export default function PushfightBoard({
   const [stagedActions, setStagedActions] = useState<TurnAction[]>([]);
   const [knockout, setKnockout] = useState<Knockout | null>(null);
   const [stagedOutcome, setStagedOutcome] = useState<"win" | "loss" | null>(null);
+  const [replayBoard, setReplayBoard] = useState<Board | null>(null);
+  const [replaying, setReplaying] = useState(false);
   const knockoutId = useRef(0);
+  const replayTimers = useRef<number[]>([]);
+
+  useEffect(() => () => replayTimers.current.forEach(window.clearTimeout), []);
 
   const myColor = myId === whitePlayerId ? "white" : "black";
   const isSetupTurn = isSetupPhase && currentPlayerId === myId;
@@ -127,12 +136,12 @@ export default function PushfightBoard({
   const turnComplete = stagedActions.at(-1)?.type === "push";
   const movesRemaining = Math.max(0, 2 - movesThisTurn - stagedMoveCount);
 
-  const displayedBoard = isSetupPhase
+  const displayedBoard = replayBoard ?? (isSetupPhase
     ? board.map((row, rowIndex) => row.map((cell, colIndex) => {
         const index = setupSelection.findIndex((coord) => coordEquals(coord, { row: rowIndex, col: colIndex }));
         return index !== -1 && cell === "empty" ? buildPreviewPiece(myColor, index) : cell;
       }))
-    : stagedBoard;
+    : stagedBoard);
 
   const legalTargets: LegalTarget[] = [];
   if (!isSetupPhase && selectedPiece && !turnComplete) {
@@ -174,7 +183,7 @@ export default function PushfightBoard({
   };
 
   const handleCellClick = (row: number, col: number) => {
-    if (!canMove || !isValidCoord({ row, col })) return;
+    if (replaying || !canMove || !isValidCoord({ row, col })) return;
     const coord = { row, col };
 
     if (isSetupPhase) {
@@ -211,6 +220,22 @@ export default function PushfightBoard({
   const columnLabels = ["A", "B", "C", "D", "E", "F", "G", "H"];
   const rowLabels = ["1", "2", "3", "4"];
   const displayedOutcome = stagedOutcome ?? gameOutcome;
+
+  const replayLastTurn = () => {
+    if (replaying || !replayEnabled || replayBoards.length < 2) return;
+    replayTimers.current.forEach(window.clearTimeout);
+    setSelectedPiece(null);
+    setReplaying(true);
+    setReplayBoard(replayBoards[0]);
+    replayTimers.current = replayBoards.slice(1).map((frame, index) => window.setTimeout(
+      () => setReplayBoard(frame),
+      650 * (index + 1),
+    ));
+    replayTimers.current.push(window.setTimeout(() => {
+      setReplayBoard(null);
+      setReplaying(false);
+    }, 650 * replayBoards.length + 500));
+  };
 
   return (
     <div className="pushfight-wrapper">
@@ -256,7 +281,7 @@ export default function PushfightBoard({
             </span>
           </div>
         )}
-        {displayedOutcome && (
+        {displayedOutcome && !replaying && (
           <div className={`pf-result-overlay ${displayedOutcome}`} role="status" aria-live="polite">
             {displayedOutcome === "win" ? "VICTORY!" : "DEFEAT"}
           </div>
@@ -275,6 +300,11 @@ export default function PushfightBoard({
           </button>
         </div>
       </form>
+      {replayBoards.length > 1 && (
+        <button className="button secondary replay-button" type="button" onClick={replayLastTurn} disabled={replaying || !replayEnabled}>
+          {replaying ? "Replaying…" : "Replay opponent’s last turn"}
+        </button>
+      )}
     </div>
   );
 }
