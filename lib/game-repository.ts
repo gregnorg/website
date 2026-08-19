@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { randomInt } from "node:crypto";
 import type { GameStatus, GameType, PlayerMark } from "./game-state.ts";
+import { transferChampionship } from "./championship.ts";
 
 export type MoveGame = {
   status: GameStatus;
@@ -53,7 +54,7 @@ export async function clearFinishedGameForPlayer(
   gameId: string,
   playerId: string,
 ): Promise<boolean> {
-  const result = await client.query(
+  const result = await client.query<{ winner_id: string }>(
     `UPDATE game_players AS gp
         SET cleared_at = now()
        FROM games AS g
@@ -80,8 +81,10 @@ export async function resignGameForPlayer(
       WHERE g.id = me.game_id
         AND g.id = $1
         AND me.user_id = $2
-        AND g.status = 'active'`,
+        AND g.status = 'active'
+      RETURNING opponent.user_id AS winner_id`,
     [gameId, playerId],
   );
+  if (result.rows[0]) await transferChampionship(client, result.rows[0].winner_id, playerId);
   return result.rowCount === 1;
 }

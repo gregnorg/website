@@ -54,3 +54,9 @@ CREATE TABLE push_subscriptions (
 );
 
 CREATE INDEX push_subscriptions_user_id_idx ON push_subscriptions(user_id);
+
+CREATE TABLE champion_state (
+  singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton),
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  crowned_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

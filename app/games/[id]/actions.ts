@@ -10,6 +10,7 @@ import { applyMove, emptyBoard as pfInitialBoard, MovePayload, movesSinceLastPus
 import { getMoveGameForPlayer, resignGameForPlayer } from "@/lib/game-repository";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type PlayerMark } from "@/lib/game-state";
 import { sendGameEndedEmail, sendTurnEmail } from "@/lib/turn-email";
+import { transferChampionship } from "@/lib/championship";
 
 export async function resignGame(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -21,7 +22,12 @@ export async function resignGame(formData: FormData) {
   const client = await pool.connect();
   let resigned = false;
   try {
+    await client.query("BEGIN");
     resigned = await resignGameForPlayer(client, gameId, session.user.id);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
   } finally {
     client.release();
   }
@@ -30,6 +36,8 @@ export async function resignGame(formData: FormData) {
 
   revalidatePath(`/games/${gameId}`);
   revalidatePath("/games");
+  revalidatePath("/leaderboard");
+  revalidatePath("/");
   redirect(`/games/${gameId}`);
 }
 
@@ -108,6 +116,8 @@ export async function makeMove(formData: FormData) {
               WHERE id = $1`,
             [gameId, session.user.id],
           );
+          const loserId = players.rows.find((row) => row.user_id !== session.user.id)?.user_id;
+          if (loserId) await transferChampionship(client, session.user.id, loserId);
         } else if (isDraw(nextBoard)) {
           await client.query(
             `UPDATE games SET status = 'draw', updated_at = now() WHERE id = $1`,
@@ -129,6 +139,8 @@ export async function makeMove(formData: FormData) {
       }
       revalidatePath(`/games/${gameId}`);
       revalidatePath("/games");
+      revalidatePath("/leaderboard");
+      revalidatePath("/");
       if (message) redirect(`/games/${gameId}?error=${encodeURIComponent(message)}`);
       redirect(`/games/${gameId}?moved=1`);
       return;
@@ -215,10 +227,13 @@ export async function makeMove(formData: FormData) {
           [gameId, session.user.id, actionPayload, moves.rows.length + 1],
         );
         if (result.winner) {
+          const winnerId = (result.winner === "white" ? playerX : playerO)!;
+          const loserId = (winnerId === playerX ? playerO : playerX)!;
           await client.query(
             `UPDATE games SET status = 'won', winner_id = $2, updated_at = now() WHERE id = $1`,
-            [gameId, result.winner === "white" ? playerX : playerO],
+            [gameId, winnerId],
           );
+          await transferChampionship(client, winnerId, loserId);
         } else {
           await client.query("UPDATE games SET updated_at = now() WHERE id = $1", [gameId]);
         }
@@ -240,6 +255,8 @@ export async function makeMove(formData: FormData) {
     }
     revalidatePath(`/games/${gameId}`);
     revalidatePath("/games");
+    revalidatePath("/leaderboard");
+    revalidatePath("/");
     if (message) redirect(`/games/${gameId}?error=${encodeURIComponent(message)}`);
     redirect(`/games/${gameId}?moved=1`);
     return;
@@ -252,6 +269,8 @@ export async function makeMove(formData: FormData) {
 
   revalidatePath(`/games/${gameId}`);
   revalidatePath("/games");
+  revalidatePath("/leaderboard");
+  revalidatePath("/");
   if (message) redirect(`/games/${gameId}?error=${encodeURIComponent(message)}`);
   redirect(`/games/${gameId}`);
 }
