@@ -8,6 +8,8 @@ import { PwaRegistration } from "@/components/pwa-registration";
 import { AppIconBadge } from "@/components/app-icon-badge";
 import { AppIconAlertPrompt } from "@/components/app-icon-alert-prompt";
 import { gamesWaitingForMove } from "@/lib/turn-count";
+import { pool } from "@/lib/db";
+import { ChampionCrown } from "@/components/champion-crown";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,8 +39,14 @@ export const viewport = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const session = await auth.api.getSession({ headers: await headers() });
-  const admin = session ? await isAdmin(session.user.id) : false;
-  const turnCount = session ? await gamesWaitingForMove(session.user.id) : 0;
+  const [admin, turnCount, championId] = session
+    ? await Promise.all([
+        isAdmin(session.user.id),
+        gamesWaitingForMove(session.user.id),
+        pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true")
+          .then((result) => result.rows[0]?.user_id ?? null),
+      ])
+    : [false, 0, null];
 
   return (
     <html lang="en">
@@ -51,7 +59,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <nav>
             {session ? (
               <>
-                <Link className="header-username" href="/account">{session.user.username}</Link>
+                <Link className="header-username" href="/account">
+                  {championId === session.user.id && <ChampionCrown />}{session.user.username}
+                </Link>
                 <Link href="/games">Games</Link>
                 <Link href="/leaderboard">Leaderboard</Link>
                 {admin && <Link href="/admin">Admin</Link>}

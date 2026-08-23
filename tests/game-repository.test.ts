@@ -48,6 +48,17 @@ test("game database operations enforce membership and finished-game clearing", a
     { user_id: opponentId, mark: "X" },
     { user_id: creatorId, mark: "O" },
   ]);
+  const clocks = await client.query<{ time_control_seconds: number; remaining: string[] }>(
+    `SELECT g.time_control_seconds,
+            array_agg(gp.time_remaining_ms ORDER BY gp.mark) AS remaining
+       FROM games g
+       JOIN game_players gp ON gp.game_id = g.id
+      WHERE g.id = $1
+      GROUP BY g.id`,
+    [gameId],
+  );
+  assert.equal(clocks.rows[0].time_control_seconds, 300);
+  assert.deepEqual(clocks.rows[0].remaining.map(Number), [300_000, 300_000]);
 
   assert.deepEqual(await getMoveGameForPlayer(client, gameId, creatorId), {
     status: "active",

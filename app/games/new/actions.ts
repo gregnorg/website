@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { createGameRecord } from "@/lib/game-repository";
-import type { GameType } from "@/lib/game-state";
 import { sendTurnEmail } from "@/lib/turn-email";
 
 export async function createGame(formData: FormData) {
@@ -13,9 +12,10 @@ export async function createGame(formData: FormData) {
   if (!session) redirect("/login");
 
   const username = String(formData.get("username") ?? "").trim();
-  const gameType = String(formData.get("game_type") ?? "pushfight").trim() as GameType;
-  if (!["tic_tac_toe", "pushfight"].includes(gameType)) {
-    redirect("/games/new?error=Invalid+game+type.");
+  const timeControlValue = String(formData.get("time_control") ?? "300");
+  const timeControlSeconds = timeControlValue === "untimed" ? null : Number(timeControlValue);
+  if (timeControlSeconds !== null && ![300, 600, 1200].includes(timeControlSeconds)) {
+    redirect("/games/new?error=Invalid+time+control.");
   }
   if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) {
     redirect("/games/new?error=Enter+a+valid+username.");
@@ -40,7 +40,14 @@ export async function createGame(formData: FormData) {
   let firstPlayerId = "";
   try {
     await client.query("BEGIN");
-    gameId = await createGameRecord(client, session.user.id, opponent.rows[0].id, gameType);
+    gameId = await createGameRecord(
+      client,
+      session.user.id,
+      opponent.rows[0].id,
+      "pushfight",
+      undefined,
+      timeControlSeconds as 300 | 600 | 1200 | null,
+    );
     const firstPlayer = await client.query<{ user_id: string }>(
       `SELECT user_id FROM game_players WHERE game_id = $1 AND mark = 'X'`,
       [gameId],

@@ -19,6 +19,7 @@ import {
   type PlayerMark,
 } from "@/lib/game-state";
 import RefreshOnReturn from "@/components/refresh-on-return";
+import { GameClocks } from "@/components/game-clocks";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function GamePage({
   const { id } = await params;
   const { error, moved } = await searchParams;
 
-  const gameResult = await pool.query<{
+  const [gameResult, championResult] = await Promise.all([pool.query<{
     status: GameStatus;
     winner_id: string | null;
     resigned_by_id: string | null;
@@ -44,8 +45,13 @@ export default async function GamePage({
     opponent_id: string;
     x_player_id: string;
     o_player_id: string;
+    time_control_seconds: number | null;
+    my_time_remaining_ms: string | null;
+    opponent_time_remaining_ms: string | null;
   }>(
-    `SELECT g.status, g.winner_id, g.resigned_by_id, g.game_type, me.mark AS my_mark,
+    `SELECT g.status, g.winner_id, g.resigned_by_id, g.game_type, g.time_control_seconds,
+            me.mark AS my_mark, me.time_remaining_ms AS my_time_remaining_ms,
+            them.time_remaining_ms AS opponent_time_remaining_ms,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id
        FROM games g
@@ -61,7 +67,7 @@ export default async function GamePage({
          ON oplayer.game_id = g.id AND oplayer.mark = 'O'
       WHERE g.id = $1`,
     [id, session.user.id],
-  );
+  ), pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true")]);
   if (!gameResult.rowCount) notFound();
   const game = gameResult.rows[0];
 
@@ -191,28 +197,25 @@ export default async function GamePage({
   return (
     <section className="game-page">
       <RefreshOnReturn />
-      <Link className="back-link" href="/games">← All games</Link>
       {moved === "1" && (
         <div className="after-move" role="status">
           <span>Move submitted.</span>
           {nextTurnGameId ? <Link href={`/games/${nextTurnGameId}`}>Play your next game →</Link> : <Link href="/games">View all games</Link>}
         </div>
       )}
-      <h1 aria-label={`${session.user.username} versus ${game.opponent_username}`}>
-        <span
-          className={game.my_mark === "X" ? "player-white" : "player-black"}
-          title={game.my_mark === "X" ? "White" : "Black"}
-        >
-          {session.user.username}
-        </span>
-        <span className="versus"> vs </span>
-        <span
-          className={game.my_mark === "X" ? "player-black" : "player-white"}
-          title={game.my_mark === "X" ? "Black" : "White"}
-        >
-          {game.opponent_username}
-        </span>
-      </h1>
+      <GameClocks
+        gameId={id}
+        myName={session.user.username ?? "You"}
+        opponentName={game.opponent_username}
+        myIsChampion={championResult.rows[0]?.user_id === session.user.id}
+        opponentIsChampion={championResult.rows[0]?.user_id === game.opponent_id}
+        myRemainingMs={Number(game.my_time_remaining_ms ?? 0)}
+        opponentRemainingMs={Number(game.opponent_time_remaining_ms ?? 0)}
+        canMove={canMove && !setupStage}
+        opponentCanMove={!setupStage && game.status === "active" && currentPlayerId === game.opponent_id}
+        myColor={game.my_mark === "X" ? "white" : "black"}
+        timed={game.time_control_seconds !== null}
+      />
       {game.game_type === "tic_tac_toe" ? (
         <>
           <p className="game-summary">{summary}</p>

@@ -15,6 +15,7 @@ CREATE TABLE games (
   game_type game_type NOT NULL DEFAULT 'tic_tac_toe',
   winner_id TEXT REFERENCES "user"(id),
   resigned_by_id TEXT REFERENCES "user"(id),
+  time_control_seconds INTEGER CHECK (time_control_seconds IN (300, 600, 1200)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -25,6 +26,7 @@ CREATE TABLE game_players (
   mark player_mark NOT NULL,
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   cleared_at TIMESTAMPTZ,
+  time_remaining_ms BIGINT CHECK (time_remaining_ms IS NULL OR time_remaining_ms >= 0),
   PRIMARY KEY (game_id, user_id),
   UNIQUE (game_id, mark)
 );

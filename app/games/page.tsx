@@ -7,18 +7,20 @@ import { gameStatusLabel } from "@/lib/game";
 import { clearFinishedGame } from "./actions";
 import { currentPlayerId, type GameStatus, type GameType, type PlayerMark } from "@/lib/game-state";
 import RefreshOnReturn from "@/components/refresh-on-return";
+import { ChampionCrown } from "@/components/champion-crown";
 
 export const dynamic = "force-dynamic";
 
 export default async function GamesPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
-  const result = await pool.query<{
+  const [result, championResult] = await Promise.all([pool.query<{
     id: string;
     status: GameStatus;
     winner_id: string | null;
     resigned_by_id: string | null;
     game_type: GameType;
+    time_control_seconds: number | null;
     my_mark: PlayerMark;
     x_player_id: string;
     o_player_id: string;
@@ -28,7 +30,8 @@ export default async function GamesPage() {
     opponent_username: string;
     opponent_id: string;
   }>(
-    `SELECT g.id, g.status, g.winner_id, g.resigned_by_id, g.game_type, me.mark AS my_mark,
+    `SELECT g.id, g.status, g.winner_id, g.resigned_by_id, g.game_type,
+            g.time_control_seconds, me.mark AS my_mark,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
             COUNT(m.id)::int AS move_count,
@@ -52,7 +55,8 @@ export default async function GamesPage() {
       GROUP BY g.id, me.mark, xplayer.user_id, oplayer.user_id, opponent.id, opponent.username
       ORDER BY g.updated_at DESC`,
     [session.user.id],
-  );
+  ), pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true")]);
+  const championId = championResult.rows[0]?.user_id;
   const games = result.rows
     .map((game) => ({
       ...game,
@@ -80,6 +84,9 @@ export default async function GamesPage() {
         <div className="game-list">
           {games.map((game) => {
             const isFinished = ["won", "draw", "cancelled"].includes(game.status);
+            const timeControl = game.time_control_seconds === null
+              ? "Untimed"
+              : `Timed · ${game.time_control_seconds / 60} minutes per player`;
 
             return <article className="game-card" key={game.id}>
               <Link className="game-card-link" href={`/games/${game.id}`}>
@@ -89,17 +96,17 @@ export default async function GamesPage() {
                       className={game.my_mark === "X" ? "player-white" : "player-black"}
                       title={game.my_mark === "X" ? "White" : "Black"}
                     >
-                      {session.user.username}
+                      {championId === session.user.id && <ChampionCrown />}{session.user.username}
                     </span>
                     <span className="versus"> vs </span>
                     <span
                       className={game.my_mark === "X" ? "player-black" : "player-white"}
                       title={game.my_mark === "X" ? "Black" : "White"}
                     >
-                      {game.opponent_username}
+                      {championId === game.opponent_id && <ChampionCrown />}{game.opponent_username}
                     </span>
                   </h2>
-                  <p>{game.game_type === "pushfight" ? "Pushfight" : "Tic-tac-toe"}</p>
+                  <p>{game.game_type === "tic_tac_toe" ? `Tic-tac-toe · ${timeControl}` : timeControl}</p>
                 </div>
                 <span className="status">
                   {game.resigned_by_id === game.opponent_id

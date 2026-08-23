@@ -28,13 +28,15 @@ export default async function NewGamePage({
     <section className="panel">
       <p className="kicker">New game</p>
       <h1>Create a match</h1>
-      <p>Choose a game and the registered player you want to play.</p>
+      <p>Choose the registered player you want to play in Pushfight.</p>
       <form action={createGame}>
         <label>
-          Game
-          <select name="game_type" defaultValue="pushfight">
-            <option value="tic_tac_toe">Tic-tac-toe</option>
-            <option value="pushfight">Pushfight</option>
+          Time per player
+          <select name="time_control" defaultValue="300">
+            <option value="untimed">Untimed</option>
+            <option value="300">5 minutes</option>
+            <option value="600">10 minutes</option>
+            <option value="1200">20 minutes</option>
           </select>
         </label>
         <label>

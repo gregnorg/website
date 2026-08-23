@@ -32,19 +32,21 @@ export async function createGameRecord(
   opponentId: string,
   gameType: GameType,
   creatorMark: PlayerMark = randomInt(2) === 0 ? "X" : "O",
+  timeControlSeconds: 300 | 600 | 1200 | null = 300,
 ): Promise<string> {
   const game = await client.query<{ id: string }>(
-    `INSERT INTO games (created_by, status, game_type)
-     VALUES ($1, 'active', $2)
+    `INSERT INTO games (created_by, status, game_type, time_control_seconds)
+     VALUES ($1, 'active', $2, $3)
      RETURNING id`,
-    [creatorId, gameType],
+    [creatorId, gameType, timeControlSeconds],
   );
   const gameId = game.rows[0].id;
   const opponentMark: PlayerMark = creatorMark === "X" ? "O" : "X";
   await client.query(
-    `INSERT INTO game_players (game_id, user_id, mark)
-     VALUES ($1, $2, $3), ($1, $4, $5)`,
-    [gameId, creatorId, creatorMark, opponentId, opponentMark],
+    `INSERT INTO game_players (game_id, user_id, mark, time_remaining_ms)
+     VALUES ($1, $2, $3, $6), ($1, $4, $5, $6)`,
+    [gameId, creatorId, creatorMark, opponentId, opponentMark,
+      timeControlSeconds === null ? null : timeControlSeconds * 1000],
   );
   return gameId;
 }

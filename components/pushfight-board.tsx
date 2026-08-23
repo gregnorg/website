@@ -26,6 +26,7 @@ type Props = {
 
 type LegalTarget = { coord: Coord; action: TurnAction; board: Board; winner?: "white" | "black" };
 type Knockout = { piece: PushfightCell; coord: Coord; dir: "up" | "down" | "left" | "right"; id: number };
+type Rotation = 0 | 1 | 2 | 3;
 
 function coordEquals(a: Coord, b: Coord) {
   return a.row === b.row && a.col === b.col;
@@ -100,6 +101,18 @@ function pieceLabel(cell: PushfightCell) {
   return `${color} pusher`;
 }
 
+function rotateCoord(coord: Coord, rotation: Rotation): Coord {
+  if (rotation === 1) return { row: coord.col, col: 3 - coord.row };
+  if (rotation === 2) return { row: 3 - coord.row, col: 7 - coord.col };
+  if (rotation === 3) return { row: 7 - coord.col, col: coord.row };
+  return coord;
+}
+
+function rotateDirection(direction: Knockout["dir"], rotation: Rotation): Knockout["dir"] {
+  const directions: Knockout["dir"][] = ["up", "right", "down", "left"];
+  return directions[(directions.indexOf(direction) + rotation) % directions.length];
+}
+
 export default function PushfightBoard({
   board,
   gameId,
@@ -123,10 +136,37 @@ export default function PushfightBoard({
   const [stagedOutcome, setStagedOutcome] = useState<"win" | "loss" | null>(null);
   const [replayBoard, setReplayBoard] = useState<Board | null>(null);
   const [replaying, setReplaying] = useState(false);
+  const [rotation, setRotation] = useState<Rotation>(0);
+  const [rotationReady, setRotationReady] = useState(false);
   const knockoutId = useRef(0);
   const replayTimers = useRef<number[]>([]);
 
   useEffect(() => () => replayTimers.current.forEach(window.clearTimeout), []);
+
+  useEffect(() => {
+    const restoreRotation = window.setTimeout(() => {
+      try {
+        const savedRotation = Number(window.localStorage.getItem(`pushfight-board-rotation:${myId}:${gameId}`));
+        if (Number.isInteger(savedRotation) && savedRotation >= 0 && savedRotation <= 3) {
+          setRotation(savedRotation as Rotation);
+        }
+      } catch {
+        // Storage can be unavailable in privacy-restricted browser contexts.
+      } finally {
+        setRotationReady(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(restoreRotation);
+  }, [gameId, myId]);
+
+  useEffect(() => {
+    if (!rotationReady) return;
+    try {
+      window.localStorage.setItem(`pushfight-board-rotation:${myId}:${gameId}`, String(rotation));
+    } catch {
+      // Rotation still works for the current visit when storage is unavailable.
+    }
+  }, [gameId, myId, rotation, rotationReady]);
 
   const myColor = myId === whitePlayerId ? "white" : "black";
   const isSetupTurn = isSetupPhase && currentPlayerId === myId;
@@ -219,6 +259,16 @@ export default function PushfightBoard({
 
   const columnLabels = ["A", "B", "C", "D", "E", "F", "G", "H"];
   const rowLabels = ["1", "2", "3", "4"];
+  const horizontalLabels = rotation === 0 ? columnLabels
+    : rotation === 1 ? rowLabels.toReversed()
+      : rotation === 2 ? columnLabels.toReversed()
+        : rowLabels;
+  const verticalLabels = rotation === 0 ? rowLabels
+    : rotation === 1 ? columnLabels
+      : rotation === 2 ? rowLabels.toReversed()
+        : columnLabels.toReversed();
+  const visualRows = rotation % 2 === 0 ? 4 : 8;
+  const visualColumns = rotation % 2 === 0 ? 8 : 4;
   const displayedOutcome = stagedOutcome ?? gameOutcome;
 
   const replayLastTurn = () => {
@@ -239,11 +289,15 @@ export default function PushfightBoard({
 
   return (
     <div className="pushfight-wrapper">
-      <div className="pf-board" aria-label="Pushfight board">
-        <div className="pf-axis-labels pf-column-labels top">{columnLabels.map((label) => <span key={label}>{label}</span>)}</div>
-        <div className="pf-axis-labels pf-column-labels bottom">{columnLabels.map((label) => <span key={label}>{label}</span>)}</div>
-        <div className="pf-axis-labels pf-row-labels left">{rowLabels.map((label) => <span key={label}>{label}</span>)}</div>
-        <div className="pf-axis-labels pf-row-labels right">{rowLabels.map((label) => <span key={label}>{label}</span>)}</div>
+      <div
+        className={`pf-board${rotation % 2 ? " rotated-sideways" : ""}`}
+        style={{ gridTemplateColumns: `repeat(${visualColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${visualRows}, minmax(0, 1fr))` }}
+        aria-label={`Pushfight board, rotated ${rotation * 90} degrees clockwise`}
+      >
+        <div className="pf-axis-labels pf-column-labels top" style={{ gridTemplateColumns: `repeat(${visualColumns}, minmax(0, 1fr))` }}>{horizontalLabels.map((label) => <span key={label}>{label}</span>)}</div>
+        <div className="pf-axis-labels pf-column-labels bottom" style={{ gridTemplateColumns: `repeat(${visualColumns}, minmax(0, 1fr))` }}>{horizontalLabels.map((label) => <span key={label}>{label}</span>)}</div>
+        <div className="pf-axis-labels pf-row-labels left" style={{ gridTemplateRows: `repeat(${visualRows}, minmax(0, 1fr))` }}>{verticalLabels.map((label) => <span key={label}>{label}</span>)}</div>
+        <div className="pf-axis-labels pf-row-labels right" style={{ gridTemplateRows: `repeat(${visualRows}, minmax(0, 1fr))` }}>{verticalLabels.map((label) => <span key={label}>{label}</span>)}</div>
         {displayedBoard.map((row, rowIndex) => row.map((cell, colIndex) => {
           const coord = { row: rowIndex, col: colIndex };
           const valid = isValidCoord(coord);
@@ -252,7 +306,8 @@ export default function PushfightBoard({
             ? setupSelection.some((item) => coordEquals(item, coord))
             : Boolean(selectedPiece && coordEquals(selectedPiece, coord));
           const legalTarget = legalTargets.find((item) => coordEquals(item.coord, coord));
-          const gridPosition = { gridRow: rowIndex + 1, gridColumn: colIndex + 1 };
+          const visualCoord = rotateCoord(coord, rotation);
+          const gridPosition = { gridRow: visualCoord.row + 1, gridColumn: visualCoord.col + 1 };
           if (!valid) return <div key={`${rowIndex}-${colIndex}`} className="pf-cell pf-hole" style={gridPosition} />;
           return (
             <button
@@ -272,8 +327,8 @@ export default function PushfightBoard({
         {knockout && (
           <div
             key={knockout.id}
-            className={`pf-knockout pf-knockout-${knockout.dir}`}
-            style={{ gridRow: knockout.coord.row + 1, gridColumn: knockout.coord.col + 1 }}
+            className={`pf-knockout pf-knockout-${rotateDirection(knockout.dir, rotation)}`}
+            style={{ gridRow: rotateCoord(knockout.coord, rotation).row + 1, gridColumn: rotateCoord(knockout.coord, rotation).col + 1 }}
             aria-label={`${pieceLabel(knockout.piece)} pushed off the board`}
           >
             <span className={pieceClass(knockout.piece)}>
@@ -300,11 +355,21 @@ export default function PushfightBoard({
           </button>
         </div>
       </form>
-      {replayBoards.length > 1 && (
-        <button className="button secondary replay-button" type="button" onClick={replayLastTurn} disabled={replaying || !replayEnabled}>
-          {replaying ? "Replaying…" : "Replay opponent’s last turn"}
+      <div className="pushfight-view-actions">
+        {replayBoards.length > 1 && (
+          <button className="button secondary replay-button" type="button" onClick={replayLastTurn} disabled={replaying || !replayEnabled}>
+            {replaying ? "Replaying…" : "View Last Turn"}
+          </button>
+        )}
+        <button
+          className="button small board-rotate-button"
+          type="button"
+          onClick={() => setRotation((current) => ((current + 1) % 4) as Rotation)}
+          aria-label="Rotate board 90 degrees clockwise"
+        >
+          <span aria-hidden="true">↻</span>
         </button>
-      )}
+      </div>
     </div>
   );
 }
