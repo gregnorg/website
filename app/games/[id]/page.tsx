@@ -214,7 +214,7 @@ export default async function GamePage({
   return (
     <section className="game-page">
       <RefreshOnReturn poll={game.status === "active"} />
-      <p className="kicker"><Link href="/games/all">All Games</Link> · <Link href={`/games/${game.game_number}`}>Game #{game.game_number}</Link>{!isPlayer && " · Spectating"}</p>
+      <p className="kicker game-heading"><Link href="/games/all">All Games</Link> · <Link href={`/games/${game.game_number}`}>Game #{game.game_number}</Link>{!isPlayer && " · Spectating"}</p>
       {isPlayer && moved === "1" && (
         <div className="after-move" role="status">
           <span>Move submitted.</span>

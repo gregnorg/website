@@ -7,11 +7,14 @@ export type PushPayload = {
 };
 
 export function buildPushPayload(payload: PushPayload, siteUrl: string) {
+  const count = payload.badgeCount;
+  const appBadge = typeof count === "number" && Number.isSafeInteger(count) && count >= 0 ? String(count) : undefined;
   // Keep the legacy fields so already-installed workers can read this payload.
   // Newer iOS versions can apply app_badge without running worker JavaScript.
   return {
     ...payload,
     web_push: 8030,
+    ...(appBadge !== undefined ? { app_badge: appBadge } : {}),
     notification: {
       title: payload.title,
       body: payload.body,
@@ -22,8 +25,8 @@ export function buildPushPayload(payload: PushPayload, siteUrl: string) {
       renotify: true,
       silent: false,
       data: { url: payload.url },
-      ...(Number.isSafeInteger(payload.badgeCount) && payload.badgeCount! >= 0
-        ? { app_badge: String(payload.badgeCount) } : {}),
+      // Older WebKit releases read app_badge inside notification.
+      ...(appBadge !== undefined ? { app_badge: appBadge } : {}),
     },
   };
 }

@@ -48,7 +48,7 @@ self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data?.json() ?? {}; } catch { /* Show a fallback notification. */ }
   const notification = data.notification ?? data;
-  const count = data.badgeCount ?? (notification.app_badge !== undefined ? Number(notification.app_badge) : undefined);
+  const count = data.badgeCount ?? ((data.app_badge ?? notification.app_badge) !== undefined ? Number(data.app_badge ?? notification.app_badge) : undefined);
   const display = Promise.resolve().then(() => self.registration.showNotification(notification.title ?? "Shove Actually", {
     body: notification.body ?? "There is an update to one of your games.",
     icon: notification.icon ?? "/icons/icon-192.png",

@@ -34,6 +34,7 @@ const payload = { title: "Your turn", body: "Make your move", url: "/games/12", 
 test("iOS receives a native badge and legacy workers still receive familiar fields", () => {
   const result = buildPushPayload(payload, "https://example.test");
   assert.equal(result.web_push, 8030);
+  assert.equal(result.app_badge, "3");
   assert.equal(result.notification.app_badge, "3");
   assert.equal(result.notification.navigate, "https://example.test/games/12");
   assert.equal(result.title, payload.title);
@@ -93,4 +94,22 @@ test("a failed count request preserves the badge instead of clearing it", async 
   t.mock.method(globalThis, "fetch", async () => new Response("Unavailable", { status: 503 }));
   await refreshAppBadge();
   assert.deepEqual(badges, []);
+});
+
+test("an older count response cannot overwrite a newer badge", async t => {
+  const badges: number[] = [];
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+    setAppBadge: async (count: number) => { badges.push(count); },
+  } });
+  t.after(() => { if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor); });
+  const resolve: ((response: Response) => void)[] = [];
+  t.mock.method(globalThis, "fetch", () => new Promise<Response>(done => { resolve.push(done); }));
+  const older = refreshAppBadge();
+  const newer = refreshAppBadge();
+  resolve[1](new Response(JSON.stringify({ count: 4 })));
+  await newer;
+  resolve[0](new Response(JSON.stringify({ count: 1 })));
+  await older;
+  assert.deepEqual(badges, [4]);
 });
