@@ -15,6 +15,7 @@ export default async function GamesPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
   const [result, championResult] = await Promise.all([pool.query<{
+    game_number: string;
     id: string;
     status: GameStatus;
     winner_id: string | null;
@@ -30,7 +31,7 @@ export default async function GamesPage() {
     opponent_username: string;
     opponent_id: string;
   }>(
-    `SELECT g.id, g.status, g.winner_id, g.resigned_by_id, g.game_type,
+    `SELECT g.game_number, g.id, g.status, g.winner_id, g.resigned_by_id, g.game_type,
             g.time_control_seconds, me.mark AS my_mark,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
@@ -77,7 +78,7 @@ export default async function GamesPage() {
     <section className="page">
       <RefreshOnReturn />
       <div className="page-heading">
-        <div><p className="kicker">Your games</p><h1>Games</h1></div>
+        <div><p className="kicker">Your games</p><h1>My Games</h1></div>
         <Link className="button" href="/games/new">New game</Link>
       </div>
       {games.length ? (
@@ -106,7 +107,7 @@ export default async function GamesPage() {
                       {championId === game.opponent_id && <ChampionCrown />}{game.opponent_username}
                     </span>
                   </h2>
-                  <p>{game.game_type === "tic_tac_toe" ? `Tic-tac-toe · ${timeControl}` : timeControl}</p>
+                  <p>Game #{game.game_number} · {game.game_type === "tic_tac_toe" ? `Tic-tac-toe · ${timeControl}` : timeControl}</p>
                 </div>
                 <span className="status">
                   {game.resigned_by_id === game.opponent_id

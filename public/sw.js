@@ -1,4 +1,4 @@
-const CACHE = "shove-actually-shell-v2";
+const CACHE = "shove-actually-shell-v3";
 const SHELL = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -33,36 +33,40 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-self.addEventListener("push", (event) => {
-  const data = event.data?.json() ?? {};
-  const work = [];
-  if ("setAppBadge" in self.navigator && Number.isFinite(data.badgeCount)) {
-    work.push(data.badgeCount > 0
-      ? self.navigator.setAppBadge(data.badgeCount)
-      : self.navigator.clearAppBadge());
+async function updateBadge(count) {
+  if (!Number.isSafeInteger(count) || count < 0) return;
+  try {
+    if (count > 0) await self.navigator.setAppBadge?.(count);
+    else if (self.navigator.clearAppBadge) await self.navigator.clearAppBadge();
+    else await self.navigator.setAppBadge?.(0);
+  } catch {
+    // Optional badging must not prevent a visible notification.
   }
-  work.push(self.registration.showNotification(data.title ?? "Shove Actually", {
-      body: data.body ?? "There is an update to one of your games.",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      data: { url: data.url ?? "/games" },
-      tag: data.tag,
-      renotify: Boolean(data.tag),
-    }));
-  // Android derives its app-icon dot from the visible notification. A badge API
-  // failure must never prevent that notification from being displayed.
-  event.waitUntil(Promise.allSettled(work));
+}
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data?.json() ?? {}; } catch { /* Show a fallback notification. */ }
+  const notification = data.notification ?? data;
+  const count = data.badgeCount ?? (notification.app_badge !== undefined ? Number(notification.app_badge) : undefined);
+  const display = Promise.resolve().then(() => self.registration.showNotification(notification.title ?? "Shove Actually", {
+    body: notification.body ?? "There is an update to one of your games.",
+    icon: notification.icon ?? "/icons/icon-192.png",
+    badge: notification.badge ?? "/icons/icon-192.png",
+    data: { url: notification.navigate ?? data.url ?? "/games" },
+    tag: notification.tag,
+    renotify: Boolean(notification.tag),
+  }));
+  event.waitUntil(Promise.allSettled([display, updateBadge(count)]));
 });
 
 self.addEventListener("message", (event) => {
   if (event.data?.type !== "TURN_BADGE_COUNT") return;
-  const count = Number(event.data.count) || 0;
-  const work = [];
-  if ("setAppBadge" in self.navigator) {
-    work.push(count > 0 ? self.navigator.setAppBadge(count) : self.navigator.clearAppBadge());
-  }
+  const count = Number(event.data.count);
+  if (!Number.isSafeInteger(count) || count < 0) return;
+  const work = [updateBadge(count)];
   if (count === 0) {
-    work.push(self.registration.getNotifications({ tag: event.data.tag }).then((notifications) => {
+    work.push(self.registration.getNotifications().then((notifications) => {
       notifications.forEach((notification) => notification.close());
     }));
   }

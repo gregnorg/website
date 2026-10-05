@@ -1,4 +1,5 @@
-import { pool } from "@/lib/db";
+import { pool } from "./db.ts";
+import type { PoolClient } from "pg";
 
 export type LeaderboardPlayer = {
   id: string;
@@ -16,12 +17,12 @@ export type Leaderboards = {
   champion: LeaderboardPlayer | null;
 };
 
-export async function getLeaderboards(): Promise<Leaderboards> {
-  const [usersResult, gamesResult, championResult] = await Promise.all([
-    pool.query<{ id: string; username: string; wins: number; completed_games: number }>(
+export async function getLeaderboards(database: Pick<PoolClient, "query"> = pool): Promise<Leaderboards> {
+  const [usersResult, gamesResult, championResult] = [
+    await database.query<{ id: string; username: string; wins: number; completed_games: number }>(
       `SELECT u.id, u.username,
               COUNT(g.id) FILTER (WHERE g.status = 'won' AND g.winner_id = u.id)::int AS wins,
-              COUNT(g.id) FILTER (WHERE g.status IN ('won', 'draw'))::int AS completed_games
+              COUNT(g.id) FILTER (WHERE g.status = 'won')::int AS completed_games
          FROM "user" u
          LEFT JOIN game_players gp ON gp.user_id = u.id
          LEFT JOIN games g
@@ -29,7 +30,7 @@ export async function getLeaderboards(): Promise<Leaderboards> {
           AND g.updated_at >= now() - interval '30 days'
         GROUP BY u.id, u.username`,
     ),
-    pool.query<{ status: string; winner_id: string | null; player_ids: string[] }>(
+    await database.query<{ status: string; winner_id: string | null; player_ids: string[] }>(
       `SELECT g.status, g.winner_id,
               ARRAY_AGG(gp.user_id ORDER BY gp.user_id) AS player_ids
          FROM games g
@@ -39,8 +40,8 @@ export async function getLeaderboards(): Promise<Leaderboards> {
         GROUP BY g.id
         ORDER BY g.updated_at DESC, g.id DESC`,
     ),
-    pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true"),
-  ]);
+    await database.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true"),
+  ] as const;
 
   const streaks = new Map<string, number>();
   const stopped = new Set<string>();

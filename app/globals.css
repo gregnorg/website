@@ -253,3 +253,14 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
   .pushfight-controls .form-actions { gap:8px; }
 }
 @media(max-width:520px){ header { height:auto; min-height:68px; padding:10px 16px; gap:12px; } nav { justify-content:flex-end; flex-wrap:wrap; gap:8px 12px; font-size:14px; } .brand { flex:0 0 82px; } main { min-height:calc(100vh - 68px); } .hero { padding-top:60px; } .page-heading { align-items:start; gap:20px; } .pwa-controls { align-items:stretch; flex-direction:column; } .pwa-controls > div, .pwa-controls .button { width:100%; max-width:none; } .app-alert-prompt { align-items:stretch; flex-direction:column; } .app-alert-prompt-actions { grid-template-columns:1fr auto; align-items:center; } }
+
+.browse-filters { display: flex; gap: 1rem; margin: 1rem 0; }
+.browse-search { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: 1.5rem; }
+.browse-search input { flex: 1; min-width: 10rem; }
+
+.game-end-actions { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 28px; }
+.draw-offer-button { padding: 6px; border: 0; color: var(--green, #295b45); background: transparent; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+.draw-offer { margin-top: 24px; padding: 16px; border: 1px solid #b6cabf; border-radius: 12px; }
+.draw-offer p { margin: 0 0 12px; }
+.draw-offer-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.draw-offer .draw-offer-note { margin: 12px 0 0; font-size: 14px; color: #52655a; }

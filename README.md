@@ -111,6 +111,8 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - `npm run lint` — lint checks
 - `npm run build` — production build
 - `npm run migrate` — apply pending database migrations
+- `npm run games:idle -- --dry-run` — preview idle reminders and cancellations without sending emails or changing games
+- `npm run games:idle` — process due idle reminders and cancellations
 - `npm run setup:push` — generate VAPID keys in `.env.local` if they are missing
 - `npm start` — production server on loopback for the local reverse proxy/tunnel
 
@@ -129,6 +131,15 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - When a game is won, only the losing player receives an idempotent result email
   identifying the winner and linking directly to the finished game. Draws and
   cancellations do not send result emails.
+- Idle games email the player whose turn it is after 3 days without a submitted
+  move, then at least 2 days between reminders until day 30. These emails respect
+  Account email settings. Moves (including setup) restart the idle period; clock
+  updates, visits, and draw offers do not. After 30 idle days the game is cancelled
+  and hidden from My Games and All Games, with no leaderboard or championship
+  effect. The hourly `shoveactually-idle-games.timer` runs even when nobody visits
+  the site. Failed emails are retried; missed reminders are not sent in a batch.
+  On an existing installation, activate with `sudo bash deploy/install-idle-games.sh`
+  after applying migrations and building.
 - `GET /api/health` checks both the application and its database connection.
 - `deploy/shoveactually.service` runs the application with automatic restart.
 - `deploy/shoveactually-healthcheck.timer` records a health check in the system

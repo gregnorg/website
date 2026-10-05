@@ -10,11 +10,18 @@ CREATE TYPE game_type AS ENUM ('tic_tac_toe', 'pushfight');
 
 CREATE TABLE games (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_number BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,
   created_by TEXT NOT NULL REFERENCES "user"(id),
   status game_status NOT NULL DEFAULT 'waiting',
   game_type game_type NOT NULL DEFAULT 'tic_tac_toe',
   winner_id TEXT REFERENCES "user"(id),
   resigned_by_id TEXT REFERENCES "user"(id),
+  draw_offered_by_id TEXT REFERENCES "user"(id),
+  draw_offer_id UUID,
+  CONSTRAINT games_draw_offer_pair CHECK ((draw_offered_by_id IS NULL) = (draw_offer_id IS NULL)),
+  idle_reminder_at TIMESTAMPTZ,
+  idle_reminder_move_count INTEGER,
+  idle_expired BOOLEAN NOT NULL DEFAULT false,
   time_control_seconds INTEGER CHECK (time_control_seconds IN (300, 600, 1200)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

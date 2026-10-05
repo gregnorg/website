@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test": "node --env-file-if-exists=.env.local --test tests/*.test.ts",
     "migrate": "node scripts/apply-migration.js",
+    "games:idle": "node --env-file-if-exists=.env.local scripts/process-idle-games.ts",
     "setup:push": "node scripts/ensure-vapid-keys.js"
   },
   "dependencies": {

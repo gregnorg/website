@@ -1,13 +1,7 @@
 import webpush from "web-push";
 import { pool } from "@/lib/db";
 
-type PushPayload = {
-  title: string;
-  body: string;
-  url: string;
-  tag: string;
-  badgeCount?: number;
-};
+import { buildPushPayload, type PushPayload } from "./push-payload.ts";
 
 function configureWebPush() {
   const publicKey = process.env.VAPID_PUBLIC_KEY;
@@ -46,7 +40,7 @@ async function sendPushNotificationUnsafe(userId: string, payload: PushPayload) 
       await webpush.sendNotification({
         endpoint: subscription.endpoint,
         keys: { p256dh: subscription.p256dh, auth: subscription.auth },
-      }, JSON.stringify(payload), { TTL: 60 * 60 * 24, urgency: "high" });
+      }, JSON.stringify(buildPushPayload(payload, process.env.PUBLIC_SITE_URL ?? "https://shoveactually.com")), { TTL: 60 * 60 * 24, urgency: "high", timeout: 15_000 });
     } catch (error) {
       const statusCode = typeof error === "object" && error && "statusCode" in error
         ? Number(error.statusCode)

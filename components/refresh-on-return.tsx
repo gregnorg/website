@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export default function RefreshOnReturn() {
+export default function RefreshOnReturn({ poll = false }: { poll?: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
@@ -18,13 +18,15 @@ export default function RefreshOnReturn() {
       if (document.visibilityState === "visible") refresh();
     };
 
+    const timer = poll ? window.setInterval(handleVisibilityChange, 5000) : undefined;
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
+      if (timer) window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [router]);
+  }, [router, poll]);
 
   return null;
 }

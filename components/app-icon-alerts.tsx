@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { refreshAppBadge } from "@/lib/app-badge";
 
 function decodeBase64Url(value: string) {
   const padding = "=".repeat((4 - value.length % 4) % 4);
@@ -34,7 +35,7 @@ export function AppIconAlerts() {
         if (!response.ok) throw new Error("Could not restore app icon alerts.");
         setEnabled(true);
       })
-      .catch(() => setSupported(false));
+      .catch(() => setMessage("Could not check alerts. Try again when you are online."));
   }, []);
 
   async function toggle() {
@@ -70,6 +71,7 @@ export function AppIconAlerts() {
       const response = await saveSubscription(subscription);
       if (!response.ok) throw new Error("Could not enable app icon alerts.");
       setEnabled(true);
+      await refreshAppBadge();
       setMessage("App icon alerts are on for this device.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not update app icon alerts.");

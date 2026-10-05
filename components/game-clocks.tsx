@@ -16,6 +16,7 @@ type Props = {
   opponentCanMove: boolean;
   myColor: "white" | "black";
   timed: boolean;
+  myTurn?: boolean;
 };
 
 function formatClock(milliseconds: number) {
@@ -25,7 +26,7 @@ function formatClock(milliseconds: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function GameClocks({ gameId, myName, opponentName, myIsChampion, opponentIsChampion, myRemainingMs, opponentRemainingMs, canMove, opponentCanMove, myColor, timed }: Props) {
+export function GameClocks({ gameId, myName, opponentName, myIsChampion, opponentIsChampion, myRemainingMs, opponentRemainingMs, canMove, opponentCanMove, myColor, timed, myTurn = canMove }: Props) {
   const router = useRouter();
   const [remainingMs, setRemainingMs] = useState(myRemainingMs);
   const [graceMs, setGraceMs] = useState(10_000);
@@ -106,9 +107,9 @@ export function GameClocks({ gameId, myName, opponentName, myIsChampion, opponen
 
   return (
     <div className="game-clocks" aria-label="Game clocks">
-      <div className={`clock-${myColor}${canMove ? " active" : ""}`}>
+      <div className={`clock-${myColor}${myTurn ? " active" : ""}`}>
         <span>{myIsChampion && <ChampionCrown />}{myName}</span>
-        <strong>{timed ? formatClock(remainingMs) : "∞"}</strong>
+        <strong>{timed ? formatClock(canMove ? remainingMs : myRemainingMs) : "∞"}</strong>
         {timed && canMove && graceMs > 0 && <small>Starts in {Math.ceil(graceMs / 1000)}s</small>}
       </div>
       <div className={`clock-${myColor === "white" ? "black" : "white"}${opponentCanMove ? " active" : ""}`}>

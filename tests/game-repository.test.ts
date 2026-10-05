@@ -7,7 +7,11 @@ import {
   createGameRecord,
   getMoveGameForPlayer,
   resignGameForPlayer,
+  offerDrawForPlayer,
+  respondToDrawForPlayer,
 } from "../lib/game-repository.ts";
+
+import { getLeaderboards } from "../lib/leaderboard.ts";
 
 test("game database operations enforce membership and finished-game clearing", async (t) => {
   if (!process.env.DATABASE_URL) {
@@ -94,4 +98,74 @@ test("game database operations enforce membership and finished-game clearing", a
   const champion = await client.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true");
   assert.equal(champion.rows[0].user_id, creatorId);
   assert.equal(await resignGameForPlayer(client, resignationGameId, opponentId), false);
+
+  await t.test("draw offers require opponent consent and ignore stale responses", async () => {
+    const drawGame = await createGameRecord(client, creatorId, opponentId, "pushfight", "X");
+    const pendingOffer = async () => (await client.query<{ draw_offer_id: string }>(
+      "SELECT draw_offer_id FROM games WHERE id = $1", [drawGame],
+    )).rows[0].draw_offer_id;
+    assert.equal(await offerDrawForPlayer(client, drawGame, outsiderId), false);
+    assert.equal(await offerDrawForPlayer(client, drawGame, creatorId), true);
+    const firstOffer = await pendingOffer();
+    assert.ok(firstOffer);
+    assert.equal(await offerDrawForPlayer(client, drawGame, opponentId), false);
+    assert.equal(await respondToDrawForPlayer(client, drawGame, creatorId, firstOffer, "accept"), false);
+    assert.equal(await respondToDrawForPlayer(client, drawGame, creatorId, firstOffer, "decline"), false);
+    assert.equal(await respondToDrawForPlayer(client, drawGame, outsiderId, firstOffer, "accept"), false);
+    assert.equal(await respondToDrawForPlayer(client, drawGame, opponentId, firstOffer, "withdraw"), false);
+    assert.equal(await respondToDrawForPlayer(client, drawGame, opponentId, firstOffer, "decline"), true);
+    assert.equal(await offerDrawForPlayer(client, drawGame, creatorId), true);
+    const secondOffer = await pendingOffer();
+    assert.notEqual(secondOffer, firstOffer);
+    assert.equal(await respondToDrawForPlayer(client, drawGame, opponentId, firstOffer, "accept"), false);
+    assert.equal(await respondToDrawForPlayer(client, drawGame, creatorId, secondOffer, "withdraw"), true);
+    assert.equal(await offerDrawForPlayer(client, drawGame, opponentId), true);
+    const thirdOffer = await pendingOffer();
+    assert.equal(await respondToDrawForPlayer(client, drawGame, creatorId, thirdOffer, "accept"), true);
+    const result = await client.query("SELECT status, winner_id, resigned_by_id, draw_offer_id, draw_offered_by_id FROM games WHERE id = $1", [drawGame]);
+    assert.deepEqual(result.rows[0], { status: "draw", winner_id: null, resigned_by_id: null, draw_offer_id: null, draw_offered_by_id: null });
+    assert.equal(await offerDrawForPlayer(client, drawGame, creatorId), false);
+    assert.equal(await respondToDrawForPlayer(client, drawGame, creatorId, thirdOffer, "accept"), false);
+    assert.equal(await resignGameForPlayer(client, drawGame, creatorId), false);
+    assert.equal((await client.query("SELECT user_id FROM champion_state WHERE singleton = true")).rows[0].user_id, creatorId);
+    assert.equal(await clearFinishedGameForPlayer(client, drawGame, creatorId), true);
+
+    const finishedGame = await createGameRecord(client, creatorId, opponentId, "tic_tac_toe", "X");
+    assert.equal(await offerDrawForPlayer(client, finishedGame, creatorId), true);
+    const finishedOffer = (await client.query("SELECT draw_offer_id FROM games WHERE id = $1", [finishedGame])).rows[0].draw_offer_id;
+    assert.equal(await resignGameForPlayer(client, finishedGame, opponentId), true);
+    assert.equal(await respondToDrawForPlayer(client, finishedGame, opponentId, finishedOffer, "accept"), false);
+    assert.equal((await client.query("SELECT draw_offer_id FROM games WHERE id = $1", [finishedGame])).rows[0].draw_offer_id, null);
+  });
+
+  await t.test("draws leave win statistics unchanged and stop both players' streaks", async () => {
+    // Establish a latest win for each player before the agreed draw.
+    for (const playerId of [creatorId, opponentId]) {
+      const winGame = await createGameRecord(client, playerId, outsiderId, "pushfight", "X");
+      await client.query("UPDATE games SET status = 'won', winner_id = $2, updated_at = now() - interval '1 second' WHERE id = $1", [winGame, playerId]);
+    }
+    // Earlier fixtures should precede the new wins in the result history.
+    await client.query("UPDATE games SET updated_at = now() - interval '2 seconds' WHERE created_by = $1 AND updated_at = now()", [creatorId]);
+    const before = await getLeaderboards(client);
+    const drawGame = await createGameRecord(client, creatorId, opponentId, "pushfight", "X");
+    await offerDrawForPlayer(client, drawGame, creatorId);
+    const offer = (await client.query("SELECT draw_offer_id FROM games WHERE id = $1", [drawGame])).rows[0].draw_offer_id;
+    assert.equal(await respondToDrawForPlayer(client, drawGame, opponentId, offer, "accept"), true);
+    const after = await getLeaderboards(client);
+    for (const playerId of [creatorId, opponentId]) {
+      const prior = before.byWins.find(p => p.id === playerId)!;
+      const next = after.byWins.find(p => p.id === playerId)!;
+      assert.ok(prior.currentStreak >= 1);
+      assert.equal(next.currentStreak, 0);
+      assert.equal(next.wins, prior.wins);
+      assert.equal(next.completedGames, prior.completedGames);
+      assert.equal(next.winPercentage, prior.winPercentage);
+    }
+    // New wins can start a fresh streak, without reaching past the draw.
+    const newWin = await createGameRecord(client, creatorId, outsiderId, "pushfight", "X");
+    await client.query("UPDATE games SET status = 'won', winner_id = $2, updated_at = clock_timestamp() WHERE id = $1", [newWin, creatorId]);
+    const restarted = await getLeaderboards(client);
+    assert.equal(restarted.byStreak.find(p => p.id === creatorId)!.currentStreak, 1);
+  });
+
 });

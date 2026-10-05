@@ -43,6 +43,8 @@ rm -f \
   /etc/systemd/system/turntable-healthcheck.timer
 
 render_unit "${WEBSITE_DIR}/deploy/shoveactually.service" /etc/systemd/system/shoveactually.service
+render_unit "${WEBSITE_DIR}/deploy/shoveactually-idle-games.service" /etc/systemd/system/shoveactually-idle-games.service
+install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-idle-games.timer" /etc/systemd/system/shoveactually-idle-games.timer
 render_unit "${WEBSITE_DIR}/deploy/shoveactually-backup.service" /etc/systemd/system/shoveactually-backup.service
 install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-backup.timer" /etc/systemd/system/shoveactually-backup.timer
 install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-healthcheck.service" /etc/systemd/system/shoveactually-healthcheck.service
@@ -54,13 +56,15 @@ install -d -m 0700 -o "${APP_USER}" -g "${APP_GROUP}" /var/backups/turntable
 
 systemctl daemon-reload
 systemctl enable --now postgresql
-systemctl enable shoveactually cloudflared shoveactually-backup.timer shoveactually-healthcheck.timer cloudflared-update.timer
+systemctl enable shoveactually cloudflared shoveactually-backup.timer shoveactually-healthcheck.timer shoveactually-idle-games.timer cloudflared-update.timer
 systemctl restart shoveactually
 systemctl restart cloudflared
 systemctl start shoveactually-backup.service
 systemctl start shoveactually-backup.timer
 systemctl start shoveactually-healthcheck.service
 systemctl start shoveactually-healthcheck.timer
+systemctl start shoveactually-idle-games.timer
+systemctl start shoveactually-idle-games.service
 
 systemctl --no-pager --full status shoveactually cloudflared shoveactually-backup.timer shoveactually-healthcheck.timer
 "${WEBSITE_DIR}/scripts/test-backup-restore.sh"

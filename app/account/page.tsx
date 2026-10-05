@@ -31,7 +31,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <p>Show when a game is waiting for your move. Requires the installed app and notification permission.</p>
       <AppIconAlerts />
       <h2>Email notifications</h2>
-      <p>Receive an email when a game is waiting for your move or when an opponent wins.</p>
+      <p>Receive turn and result emails, plus reminders after 3 idle days and every other day afterward. After 30 days without a move, the game is cancelled and removed from game lists without affecting leaderboard stats.</p>
       <form action={updateEmailNotifications} className="notification-settings-form">
         <label className="checkbox-label">
           <input name="emailNotifications" type="checkbox" defaultChecked={emailNotifications} />

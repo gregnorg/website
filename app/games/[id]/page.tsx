@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { Board, EMPTY_BOARD } from "@/lib/game";
-import { makeMove, resignGame } from "./actions";
+import { makeMove, resignGame, manageDrawOffer } from "./actions";
 import PushfightBoard from "@/components/pushfight-board";
 import { applyMove, emptyBoard, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
 import { TicTacToeBoard } from "@/components/tic-tac-toe-board";
@@ -31,14 +31,18 @@ export default async function GamePage({
   searchParams: Promise<{ error?: string; moved?: string }>;
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/login");
-  const { id } = await params;
+  const { id: requestedId } = await params;
   const { error, moved } = await searchParams;
 
   const [gameResult, championResult] = await Promise.all([pool.query<{
+    id: string;
+    game_number: string;
+    my_username: string;
     status: GameStatus;
     winner_id: string | null;
     resigned_by_id: string | null;
+    draw_offered_by_id: string | null;
+    draw_offer_id: string | null;
     game_type: GameType;
     my_mark: PlayerMark;
     opponent_username: string;
@@ -49,27 +53,31 @@ export default async function GamePage({
     my_time_remaining_ms: string | null;
     opponent_time_remaining_ms: string | null;
   }>(
-    `SELECT g.status, g.winner_id, g.resigned_by_id, g.game_type, g.time_control_seconds,
+    `SELECT g.id, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
             me.mark AS my_mark, me.time_remaining_ms AS my_time_remaining_ms,
             them.time_remaining_ms AS opponent_time_remaining_ms,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id
        FROM games g
        JOIN game_players me
-         ON me.game_id = g.id AND me.user_id = $2
+         ON me.game_id = g.id AND me.mark = CASE WHEN EXISTS (SELECT 1 FROM game_players viewer WHERE viewer.game_id = g.id AND viewer.user_id = $2 AND viewer.mark = 'O') THEN 'O'::player_mark ELSE 'X'::player_mark END
        JOIN game_players them
-         ON them.game_id = g.id AND them.user_id <> $2
+         ON them.game_id = g.id AND them.user_id <> me.user_id
+       JOIN "user" mine ON mine.id = me.user_id
        JOIN "user" opponent
          ON opponent.id = them.user_id
        JOIN game_players xplayer
          ON xplayer.game_id = g.id AND xplayer.mark = 'X'
        JOIN game_players oplayer
          ON oplayer.game_id = g.id AND oplayer.mark = 'O'
-      WHERE g.id = $1`,
-    [id, session.user.id],
+      WHERE (g.id::text = $1 OR g.game_number::text = $1) AND NOT g.idle_expired`,
+    [requestedId, session?.user.id ?? ""],
   ), pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true")]);
   if (!gameResult.rowCount) notFound();
   const game = gameResult.rows[0];
+  const id = game.id;
+  const viewerId = session?.user.id ?? "";
+  const isPlayer = viewerId === game.x_player_id || viewerId === game.o_player_id;
 
   const isTicTacToe = game.game_type === "tic_tac_toe";
   const moves = await pool.query<GameMove>(
@@ -94,9 +102,9 @@ export default async function GamePage({
   const setupStage = isSetupPhase(game.game_type, turnSummary);
   const currentPlayerId = getCurrentPlayerId(game.game_type, xPlayerId, oPlayerId, turnSummary);
   const movesThisTurn = movesSinceLastPush(moves.rows);
-  const canMove = game.status === "active" && currentPlayerId === session.user.id;
-  const replayEnabled = game.status !== "active" || currentPlayerId !== game.opponent_id;
-  const lastOpponentMoveIndex = moves.rows.findLastIndex((move) => move.player_id === game.opponent_id);
+  const canMove = game.status === "active" && currentPlayerId === viewerId;
+  const replayEnabled = !isPlayer || game.status !== "active" || currentPlayerId !== game.opponent_id;
+  const lastOpponentMoveIndex = !isPlayer ? moves.rows.length - 1 : moves.rows.findLastIndex((move) => move.player_id === game.opponent_id);
   const ticTacToeReplayPosition = isTicTacToe && lastOpponentMoveIndex >= 0
     ? moves.rows[lastOpponentMoveIndex].position
     : null;
@@ -127,7 +135,7 @@ export default async function GamePage({
   }
 
   let nextTurnGameId: string | null = null;
-  if (moved === "1") {
+  if (isPlayer && moved === "1") {
     const candidates = await pool.query<{
       id: string;
       game_type: GameType;
@@ -154,7 +162,7 @@ export default async function GamePage({
         WHERE g.status = 'active' AND me.cleared_at IS NULL AND g.id <> $2
         GROUP BY g.id, xplayer.user_id, oplayer.user_id
         ORDER BY g.updated_at DESC`,
-      [session.user.id, id],
+      [viewerId, id],
     );
     nextTurnGameId = candidates.rows.find((candidate) => getCurrentPlayerId(
       candidate.game_type,
@@ -165,7 +173,7 @@ export default async function GamePage({
         setupMoveCount: candidate.setup_move_count,
         lastTurnPlayerId: candidate.last_turn_player_id,
       },
-    ) === session.user.id)?.id ?? null;
+    ) === viewerId)?.id ?? null;
   }
 
   let summary = `Waiting for ${game.opponent_username} to move.`;
@@ -183,34 +191,45 @@ export default async function GamePage({
   if (game.status === "won") {
     if (game.resigned_by_id === game.opponent_id) {
       summary = `${game.opponent_username} resigned. You won!`;
-    } else if (game.resigned_by_id === session.user.id) {
+    } else if (game.resigned_by_id === viewerId) {
       summary = `You resigned. ${game.opponent_username} won.`;
     } else {
-      summary = game.winner_id === session.user.id
+      summary = game.winner_id === viewerId
         ? "You won!"
         : `${game.opponent_username} won.`;
     }
+  }
+
+  if (!isPlayer) {
+    const currentName = currentPlayerId === xPlayerId ? game.my_username : game.opponent_username;
+    summary = game.status === "active"
+      ? `${currentName}’s turn${setupStage ? " to set up" : ""}.`
+      : game.status === "won"
+        ? `${game.winner_id === xPlayerId ? game.my_username : game.opponent_username} won${game.resigned_by_id ? " by resignation" : ""}.`
+        : game.status === "draw" ? "Draw." : game.status === "cancelled" ? "Cancelled." : "Waiting for players.";
   }
 
   const moveAction = makeMove;
 
   return (
     <section className="game-page">
-      <RefreshOnReturn />
-      {moved === "1" && (
+      <RefreshOnReturn poll={game.status === "active"} />
+      <p className="kicker"><Link href="/games/all">All Games</Link> · <Link href={`/games/${game.game_number}`}>Game #{game.game_number}</Link>{!isPlayer && " · Spectating"}</p>
+      {isPlayer && moved === "1" && (
         <div className="after-move" role="status">
           <span>Move submitted.</span>
-          {nextTurnGameId ? <Link href={`/games/${nextTurnGameId}`}>Play your next game →</Link> : <Link href="/games">View all games</Link>}
+          {nextTurnGameId ? <Link href={`/games/${nextTurnGameId}`}>Play your next game →</Link> : <Link href="/games">View my games</Link>}
         </div>
       )}
       <GameClocks
         gameId={id}
-        myName={session.user.username ?? "You"}
+        myName={game.my_username}
         opponentName={game.opponent_username}
-        myIsChampion={championResult.rows[0]?.user_id === session.user.id}
+        myIsChampion={championResult.rows[0]?.user_id === (game.my_mark === "X" ? xPlayerId : oPlayerId)}
         opponentIsChampion={championResult.rows[0]?.user_id === game.opponent_id}
         myRemainingMs={Number(game.my_time_remaining_ms ?? 0)}
         opponentRemainingMs={Number(game.opponent_time_remaining_ms ?? 0)}
+        myTurn={!setupStage && game.status === "active" && currentPlayerId === (game.my_mark === "X" ? xPlayerId : oPlayerId)}
         canMove={canMove && !setupStage}
         opponentCanMove={!setupStage && game.status === "active" && currentPlayerId === game.opponent_id}
         myColor={game.my_mark === "X" ? "white" : "black"}
@@ -224,6 +243,7 @@ export default async function GamePage({
           <TicTacToeBoard
             board={board}
             replayPosition={ticTacToeReplayPosition}
+            replayLabel={!isPlayer ? "Replay last turn" : undefined}
             replayEnabled={replayEnabled}
             gameId={id}
             canMove={canMove}
@@ -233,10 +253,11 @@ export default async function GamePage({
       ) : (
         <>
           <PushfightBoard
-            key={moves.rows.length}
+            key={`${id}:${moves.rows.length}`}
             board={pushfightBoard}
             gameId={id}
-            myId={session.user.id}
+            spectator={!isPlayer}
+            myId={isPlayer ? viewerId : "spectator"}
             currentPlayerId={currentPlayerId}
             whitePlayerId={xPlayerId}
             blackPlayerId={oPlayerId}
@@ -248,17 +269,41 @@ export default async function GamePage({
             setupTurnPlayerId={setupStage ? currentPlayerId : ""}
             statusMessage={summary}
             errorMessage={error}
-            gameOutcome={game.status === "won" ? (game.winner_id === session.user.id ? "win" : "loss") : null}
+            gameOutcome={isPlayer && game.status === "won" ? (game.winner_id === viewerId ? "win" : "loss") : null}
             replayBoards={pushfightReplayBoards}
             replayEnabled={replayEnabled}
           />
         </>
       )}
-      {game.status === "active" && (
-        <form action={resignGame} className="resign-form">
-          <input type="hidden" name="gameId" value={id} />
-          <ConfirmResignButton />
-        </form>
+      {isPlayer && game.status === "active" && (
+        <>
+          {game.draw_offer_id && <div className="draw-offer" role="status">
+            <p>{game.draw_offered_by_id === viewerId
+              ? "You offered a draw. Waiting for your opponent to respond."
+              : `${game.opponent_username} offered a draw.`}</p>
+            <form action={manageDrawOffer} className="draw-offer-actions">
+              <input type="hidden" name="gameId" value={id} />
+              <input type="hidden" name="offerId" value={game.draw_offer_id} />
+              {game.draw_offered_by_id === viewerId
+                ? <button className="button secondary small" name="response" value="withdraw">Withdraw offer</button>
+                : <>
+                  <button className="button small" name="response" value="accept">Accept draw</button>
+                  <button className="button secondary small" name="response" value="decline">Decline</button>
+                </>}
+            </form>
+            <p className="draw-offer-note">Play continues until the draw is accepted.</p>
+          </div>}
+          <div className="game-end-actions">
+            <form action={resignGame}>
+              <input type="hidden" name="gameId" value={id} />
+              <ConfirmResignButton />
+            </form>
+            {!game.draw_offer_id && <form action={manageDrawOffer}>
+              <input type="hidden" name="gameId" value={id} />
+              <button className="draw-offer-button" name="response" value="offer">Offer draw</button>
+            </form>}
+          </div>
+        </>
       )}
     </section>
   );

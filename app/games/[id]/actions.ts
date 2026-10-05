@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { Board, EMPTY_BOARD, isDraw, play, winner } from "@/lib/game";
 import { applyMove, emptyBoard as pfInitialBoard, MovePayload, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
-import { getMoveGameForPlayer, resignGameForPlayer } from "@/lib/game-repository";
+import { getMoveGameForPlayer, resignGameForPlayer, offerDrawForPlayer, respondToDrawForPlayer } from "@/lib/game-repository";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type PlayerMark } from "@/lib/game-state";
 import { sendGameEndedEmail, sendTurnEmail } from "@/lib/turn-email";
 import { transferChampionship } from "@/lib/championship";
@@ -112,7 +112,7 @@ export async function makeMove(formData: FormData) {
         if (winningMark) {
           await client.query(
             `UPDATE games
-                SET status = 'won', winner_id = $2, updated_at = now()
+                SET status = 'won', winner_id = $2, draw_offered_by_id = NULL, draw_offer_id = NULL, updated_at = now()
               WHERE id = $1`,
             [gameId, session.user.id],
           );
@@ -120,7 +120,7 @@ export async function makeMove(formData: FormData) {
           if (loserId) await transferChampionship(client, session.user.id, loserId);
         } else if (isDraw(nextBoard)) {
           await client.query(
-            `UPDATE games SET status = 'draw', updated_at = now() WHERE id = $1`,
+            `UPDATE games SET status = 'draw', draw_offered_by_id = NULL, draw_offer_id = NULL, updated_at = now() WHERE id = $1`,
             [gameId],
           );
         } else {
@@ -230,7 +230,7 @@ export async function makeMove(formData: FormData) {
           const winnerId = (result.winner === "white" ? playerX : playerO)!;
           const loserId = (winnerId === playerX ? playerO : playerX)!;
           await client.query(
-            `UPDATE games SET status = 'won', winner_id = $2, updated_at = now() WHERE id = $1`,
+            `UPDATE games SET status = 'won', winner_id = $2, draw_offered_by_id = NULL, draw_offer_id = NULL, updated_at = now() WHERE id = $1`,
             [gameId, winnerId],
           );
           await transferChampionship(client, winnerId, loserId);
@@ -273,4 +273,37 @@ export async function makeMove(formData: FormData) {
   revalidatePath("/");
   if (message) redirect(`/games/${gameId}?error=${encodeURIComponent(message)}`);
   redirect(`/games/${gameId}`);
+}
+
+export async function manageDrawOffer(formData: FormData) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/login");
+  const gameId = String(formData.get("gameId") ?? "");
+  const offerId = String(formData.get("offerId") ?? "");
+  const response = String(formData.get("response") ?? "");
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuid.test(gameId)) redirect("/games");
+  if (response !== "offer" && response !== "accept" && response !== "decline" && response !== "withdraw") {
+    redirect(`/games/${gameId}`);
+  }
+  if (response !== "offer" && !uuid.test(offerId)) redirect(`/games/${gameId}`);
+
+  const client = await pool.connect();
+  let changed = false;
+  try {
+    await client.query("BEGIN");
+    changed = response === "offer"
+      ? await offerDrawForPlayer(client, gameId, session.user.id)
+      : await respondToDrawForPlayer(client, gameId, session.user.id, offerId, response);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+  revalidatePath("/games", "layout");
+  revalidatePath("/leaderboard");
+  revalidatePath("/");
+  redirect(changed ? `/games/${gameId}` : `/games/${gameId}?error=${encodeURIComponent("That draw offer is no longer available. Please check the game and try again.")}`);
 }

@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     if (remainingMs === 0) {
       const winnerId = session.user.id === game.x_player_id ? game.o_player_id : game.x_player_id;
       await client.query(
-        `UPDATE games SET status = 'won', winner_id = $2, updated_at = now()
+        `UPDATE games SET status = 'won', winner_id = $2, draw_offered_by_id = NULL, draw_offer_id = NULL, updated_at = now()
           WHERE id = $1 AND status = 'active'`,
         [gameId, winnerId],
       );

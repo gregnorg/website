@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { refreshAppBadge } from "@/lib/app-badge";
 
 const DISMISSED_KEY = "app-icon-alert-prompt-dismissed";
 
@@ -63,6 +64,7 @@ export function AppIconAlertPrompt() {
         body: JSON.stringify(subscription),
       });
       if (!response.ok) throw new Error("Could not enable app icon alerts.");
+      await refreshAppBadge();
       setVisible(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not enable app icon alerts.");

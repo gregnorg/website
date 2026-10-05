@@ -8,6 +8,7 @@ type Props = {
   board: Board;
   gameId: string;
   myId: string;
+  spectator?: boolean;
   currentPlayerId: string;
   whitePlayerId: string;
   blackPlayerId: string;
@@ -117,6 +118,7 @@ export default function PushfightBoard({
   board,
   gameId,
   myId,
+  spectator = false,
   currentPlayerId,
   whitePlayerId,
   canMove,
@@ -342,7 +344,7 @@ export default function PushfightBoard({
           </div>
         )}
       </div>
-      <form action={action} className="pushfight-controls">
+      {!spectator && <form action={action} className="pushfight-controls">
         <input type="hidden" name="gameId" value={gameId} />
         <input type="hidden" name="action_type" value={isSetupPhase ? "setup" : turnComplete ? "turn" : ""} />
         <input type="hidden" name="action_payload" value={actionPayload ? JSON.stringify(actionPayload) : ""} />
@@ -354,7 +356,7 @@ export default function PushfightBoard({
             Reset
           </button>
         </div>
-      </form>
+      </form>}
       <div className="pushfight-view-actions">
         {replayBoards.length > 1 && (
           <button className="button secondary replay-button" type="button" onClick={replayLastTurn} disabled={replaying || !replayEnabled}>

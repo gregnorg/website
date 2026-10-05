@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Shove Actually idle games every hour
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=2m
+
+[Install]
+WantedBy=timers.target

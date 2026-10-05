@@ -1,0 +1,19 @@
+[Unit]
+Description=Remind players about idle games and cancel games idle for 30 days
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=@@APP_USER@@
+Group=@@APP_GROUP@@
+WorkingDirectory=@@WEBSITE_DIR@@
+Environment=NODE_ENV=production
+EnvironmentFile=@@WEBSITE_DIR@@/.env.local
+ExecStart=@@NODE_BIN@@ @@WEBSITE_DIR@@/scripts/process-idle-games.ts
+TimeoutStartSec=20min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only

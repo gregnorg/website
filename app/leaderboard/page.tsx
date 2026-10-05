@@ -30,7 +30,7 @@ export default async function LeaderboardPage() {
       <div className="leaderboard-grid">
         <article className="leaderboard-card">
           <h2>Winning percentage</h2>
-          <p>Wins divided by completed games.</p>
+          <p>Wins divided by wins and losses. Draws are excluded.</p>
           <Ranking players={boards.byPercentage} value={(player) => `${(player.winPercentage * 100).toFixed(1)}% (${player.wins}/${player.completedGames})`} />
         </article>
         <article className="leaderboard-card">
@@ -40,7 +40,7 @@ export default async function LeaderboardPage() {
         </article>
         <article className="leaderboard-card">
           <h2>Winning streak</h2>
-          <p>Current consecutive wins.</p>
+          <p>Current consecutive wins. A loss or draw ends the streak.</p>
           <Ranking players={boards.byStreak} value={(player) => `${player.currentStreak} ${player.currentStreak === 1 ? "game" : "games"}`} />
         </article>
         <article className="leaderboard-card champion-card">

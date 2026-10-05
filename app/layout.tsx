@@ -51,7 +51,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="en">
       <body>
-        <PwaRegistration />
+        <PwaRegistration userId={session?.user.id ?? null} />
         <AppIconBadge initialCount={turnCount} />
         {session && <AppIconAlertPrompt />}
         <header>
@@ -62,13 +62,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
                 <Link className="header-username" href="/account">
                   {championId === session.user.id && <ChampionCrown />}{session.user.username}
                 </Link>
-                <Link href="/games">Games</Link>
+                <Link href="/games">My Games</Link>
+                <Link href="/games/all">All Games</Link>
                 <Link href="/leaderboard">Leaderboard</Link>
                 {admin && <Link href="/admin">Admin</Link>}
                 <SignOutLink />
               </>
             ) : (
               <>
+                <Link href="/games/all">All Games</Link>
                 <Link href="/leaderboard">Leaderboard</Link>
                 <Link href="/login">Log in</Link>
                 <Link className="button small" href="/signup">Create account</Link>

@@ -77,7 +77,7 @@ export async function resignGameForPlayer(
   const result = await client.query(
     `UPDATE games AS g
         SET status = 'won', winner_id = opponent.user_id,
-            resigned_by_id = me.user_id, updated_at = now()
+            resigned_by_id = me.user_id, draw_offered_by_id = NULL, draw_offer_id = NULL, updated_at = now()
        FROM game_players AS me
        JOIN game_players AS opponent
          ON opponent.game_id = me.game_id AND opponent.user_id <> me.user_id
@@ -89,5 +89,43 @@ export async function resignGameForPlayer(
     [gameId, playerId],
   );
   if (result.rows[0]) await transferChampionship(client, result.rows[0].winner_id, playerId);
+  return result.rowCount === 1;
+}
+
+export async function offerDrawForPlayer(
+  client: PoolClient,
+  gameId: string,
+  playerId: string,
+): Promise<boolean> {
+  const result = await client.query(
+    `UPDATE games AS g
+        SET draw_offered_by_id = $2, draw_offer_id = gen_random_uuid()
+      WHERE g.id = $1 AND g.status = 'active' AND g.draw_offer_id IS NULL
+        AND EXISTS (SELECT 1 FROM game_players WHERE game_id = g.id AND user_id = $2)`,
+    [gameId, playerId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function respondToDrawForPlayer(
+  client: PoolClient,
+  gameId: string,
+  playerId: string,
+  offerId: string,
+  response: "accept" | "decline" | "withdraw",
+): Promise<boolean> {
+  const result = await client.query(
+    `UPDATE games AS g
+        SET status = CASE WHEN $4 = 'accept' THEN 'draw'::game_status ELSE g.status END,
+            winner_id = CASE WHEN $4 = 'accept' THEN NULL ELSE g.winner_id END,
+            resigned_by_id = CASE WHEN $4 = 'accept' THEN NULL ELSE g.resigned_by_id END,
+            updated_at = CASE WHEN $4 = 'accept' THEN now() ELSE g.updated_at END,
+            draw_offered_by_id = NULL, draw_offer_id = NULL
+      WHERE g.id = $1 AND g.status = 'active' AND g.draw_offer_id = $3
+        AND (($4 IN ('accept', 'decline') AND g.draw_offered_by_id <> $2)
+          OR ($4 = 'withdraw' AND g.draw_offered_by_id = $2))
+        AND EXISTS (SELECT 1 FROM game_players WHERE game_id = g.id AND user_id = $2)`,
+    [gameId, playerId, offerId, response],
+  );
   return result.rowCount === 1;
 }

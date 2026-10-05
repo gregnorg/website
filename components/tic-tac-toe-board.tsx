@@ -7,12 +7,13 @@ type Props = {
   board: Board;
   replayPosition: number | null;
   replayEnabled: boolean;
+  replayLabel?: string;
   gameId: string;
   canMove: boolean;
   action: (formData: FormData) => Promise<void>;
 };
 
-export function TicTacToeBoard({ board, replayPosition, replayEnabled, gameId, canMove, action }: Props) {
+export function TicTacToeBoard({ board, replayPosition, replayEnabled, replayLabel = "Replay opponent’s last turn", gameId, canMove, action }: Props) {
   const [replaying, setReplaying] = useState(false);
   const [showLastMove, setShowLastMove] = useState(true);
   const timers = useRef<number[]>([]);
@@ -53,7 +54,7 @@ export function TicTacToeBoard({ board, replayPosition, replayEnabled, gameId, c
       </div>
       {replayPosition !== null && (
         <button className="button secondary replay-button" type="button" onClick={replay} disabled={replaying || !replayEnabled}>
-          {replaying ? "Replaying…" : "Replay opponent’s last turn"}
+          {replaying ? "Replaying…" : replayLabel}
         </button>
       )}
     </>
