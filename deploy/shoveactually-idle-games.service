@@ -1,5 +1,5 @@
 [Unit]
-Description=Remind players about idle games and cancel games idle for 30 days
+Description=Remind players about idle games and forfeit games idle for 7 days
 After=network-online.target postgresql.service
 Wants=network-online.target
 Requires=postgresql.service

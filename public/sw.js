@@ -45,6 +45,9 @@ async function updateBadge(count) {
 }
 
 self.addEventListener("push", (event) => {
+  // WebKit declarative events carry the proposed notification separately and
+  // may have no event.data. Leave the native notification and app badge intact.
+  if (event.notification) return;
   let data = {};
   try { data = event.data?.json() ?? {}; } catch { /* Show a fallback notification. */ }
   const notification = data.notification ?? data;

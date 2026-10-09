@@ -19,7 +19,7 @@ export default async function GamesPage() {
     id: string;
     status: GameStatus;
     winner_id: string | null;
-    resigned_by_id: string | null;
+    resigned_by_id: string | null; idle_expired: boolean;
     game_type: GameType;
     time_control_seconds: number | null;
     my_mark: PlayerMark;
@@ -31,7 +31,7 @@ export default async function GamesPage() {
     opponent_username: string;
     opponent_id: string;
   }>(
-    `SELECT g.game_number, g.id, g.status, g.winner_id, g.resigned_by_id, g.game_type,
+    `SELECT g.game_number, g.id, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.game_type,
             g.time_control_seconds, me.mark AS my_mark,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
@@ -110,7 +110,9 @@ export default async function GamesPage() {
                   <p>Game #{game.game_number} · {game.game_type === "tic_tac_toe" ? `Tic-tac-toe · ${timeControl}` : timeControl}</p>
                 </div>
                 <span className="status">
-                  {game.resigned_by_id === game.opponent_id
+                  {game.idle_expired && game.status === "won"
+                    ? game.winner_id === session.user.id ? "Won by idle forfeit" : "Lost by idle forfeit"
+                    : game.resigned_by_id === game.opponent_id
                     ? "Opponent resigned"
                     : game.resigned_by_id === session.user.id
                       ? "You resigned"

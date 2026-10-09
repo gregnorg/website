@@ -18,8 +18,8 @@ export default async function AllGamesPage({ searchParams }: {
     pool.query<{
       game_number: string; status: GameStatus; game_type: GameType;
       white_name: string; black_name: string; white_id: string; black_id: string;
-      winner_id: string | null; resigned_by_id: string | null; time_control_seconds: number | null;
-    }>(`SELECT g.game_number, g.status, g.game_type, g.winner_id, g.resigned_by_id,
+      winner_id: string | null; resigned_by_id: string | null; idle_expired: boolean; time_control_seconds: number | null;
+    }>(`SELECT g.game_number, g.status, g.game_type, g.winner_id, g.resigned_by_id, g.idle_expired,
                g.time_control_seconds, w.username AS white_name, b.username AS black_name,
                w.id AS white_id, b.id AS black_id
           FROM games g
@@ -27,7 +27,7 @@ export default async function AllGamesPage({ searchParams }: {
           JOIN game_players bp ON bp.game_id = g.id AND bp.mark = 'O'
           JOIN "user" w ON w.id = wp.user_id
           JOIN "user" b ON b.id = bp.user_id
-         WHERE NOT g.idle_expired AND g.status = ANY($1::game_status[])
+         WHERE (NOT g.idle_expired OR g.status = 'won') AND g.status = ANY($1::game_status[])
            AND ($2 = '' OR strpos(lower(w.username), lower($2)) > 0
                 OR strpos(lower(b.username), lower($2)) > 0 OR g.game_number::text = $3)
          ORDER BY g.updated_at DESC, g.game_number DESC LIMIT 31 OFFSET $4`,
@@ -51,7 +51,7 @@ export default async function AllGamesPage({ searchParams }: {
     </form>
     {result.rows.length ? <div className="game-list">{result.rows.slice(0, 30).map(game => {
       const outcome = game.status === "won"
-        ? `${game.winner_id === game.white_id ? game.white_name : game.black_name} won${game.resigned_by_id ? " by resignation" : ""}`
+        ? `${game.winner_id === game.white_id ? game.white_name : game.black_name} won${game.idle_expired ? " by idle forfeit" : game.resigned_by_id ? " by resignation" : ""}`
         : game.status === "draw" ? "Draw" : game.status === "cancelled" ? "Cancelled" : game.status === "waiting" ? "Waiting" : "In progress";
       return <article className="game-card" key={game.game_number}>
         <Link className="game-card-link" href={`/games/${game.game_number}`}>

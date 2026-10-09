@@ -17,19 +17,28 @@ function workerHarness(badgeApi: Record<string, unknown> = {}) {
     addEventListener: (type: string, handler: (event: unknown) => void) => handlers.set(type, handler),
   };
   vm.runInNewContext(readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), { self, URL });
-  async function push(data: unknown, malformed = false) {
+  async function push(data: unknown, malformed = false, nativeNotification?: object) {
     let done: Promise<unknown> | undefined;
     handlers.get("push")!({
-      data: { json: () => { if (malformed) throw new Error("Invalid JSON"); return data; } },
+      notification: nativeNotification,
+      data: nativeNotification ? null : { json: () => { if (malformed) throw new Error("Invalid JSON"); return data; } },
       waitUntil: (work: Promise<unknown>) => { done = work; },
     });
-    assert.ok(done);
+    if (!nativeNotification) assert.ok(done);
     await done;
   }
   return { notifications, push };
 }
 
 const payload = { title: "Your turn", body: "Make your move", url: "/games/12", tag: "turn-12", badgeCount: 3 };
+
+test("native iOS push events without JSON retain their proposed notification and badge", async () => {
+  const badges: number[] = [];
+  const worker = workerHarness({ setAppBadge: async (count: number) => { badges.push(count); } });
+  await worker.push(undefined, false, { title: "Your turn", body: "Make your move" });
+  assert.equal(worker.notifications.length, 0);
+  assert.deepEqual(badges, []);
+});
 
 test("iOS receives a native badge and legacy workers still receive familiar fields", () => {
   const result = buildPushPayload(payload, "https://example.test");
@@ -94,6 +103,19 @@ test("a failed count request preserves the badge instead of clearing it", async 
   t.mock.method(globalThis, "fetch", async () => new Response("Unavailable", { status: 503 }));
   await refreshAppBadge();
   assert.deepEqual(badges, []);
+});
+
+test("an expired login preserves the badge and does not tell the worker to dismiss notifications", async t => {
+  const updates: unknown[] = [];
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+    clearAppBadge: async () => { updates.push("cleared"); },
+    serviceWorker: { controller: { postMessage: (message: unknown) => updates.push(message) } },
+  } });
+  t.after(() => { if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor); });
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }));
+  await refreshAppBadge();
+  assert.deepEqual(updates, []);
 });
 
 test("an older count response cannot overwrite a newer badge", async t => {

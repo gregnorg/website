@@ -9,7 +9,7 @@ import { Board, EMPTY_BOARD, isDraw, play, winner } from "@/lib/game";
 import { applyMove, emptyBoard as pfInitialBoard, MovePayload, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
 import { getMoveGameForPlayer, resignGameForPlayer, offerDrawForPlayer, respondToDrawForPlayer } from "@/lib/game-repository";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type PlayerMark } from "@/lib/game-state";
-import { sendGameEndedEmail, sendTurnEmail } from "@/lib/turn-email";
+import { sendGameEndedEmail, sendTurnNotification } from "@/lib/turn-email";
 import { transferChampionship } from "@/lib/championship";
 
 export async function resignGame(formData: FormData) {
@@ -134,7 +134,7 @@ export async function makeMove(formData: FormData) {
           await sendGameEndedEmail(gameId, `move-${moves.rows.length + 1}`);
         } else if (!isDraw(nextBoard)) {
           const nextPlayerId = players.rows.find((row) => row.user_id !== session.user.id)?.user_id;
-          if (nextPlayerId) await sendTurnEmail(gameId, nextPlayerId, `move-${moves.rows.length + 1}`);
+          if (nextPlayerId) await sendTurnNotification(gameId, nextPlayerId);
         }
       }
       revalidatePath(`/games/${gameId}`);
@@ -246,7 +246,7 @@ export async function makeMove(formData: FormData) {
             { player_id: session.user.id, payload: actionPayload },
           ]);
           const nextPlayer = currentPlayerId(game.game_type, playerX!, playerO!, nextSummary);
-          await sendTurnEmail(gameId, nextPlayer, `move-${moves.rows.length + 1}`);
+          await sendTurnNotification(gameId, nextPlayer);
         }
       } catch (err) {
         await client.query("ROLLBACK");

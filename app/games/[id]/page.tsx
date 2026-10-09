@@ -40,7 +40,7 @@ export default async function GamePage({
     my_username: string;
     status: GameStatus;
     winner_id: string | null;
-    resigned_by_id: string | null;
+    resigned_by_id: string | null; idle_expired: boolean;
     draw_offered_by_id: string | null;
     draw_offer_id: string | null;
     game_type: GameType;
@@ -53,7 +53,7 @@ export default async function GamePage({
     my_time_remaining_ms: string | null;
     opponent_time_remaining_ms: string | null;
   }>(
-    `SELECT g.id, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
+    `SELECT g.id, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
             me.mark AS my_mark, me.time_remaining_ms AS my_time_remaining_ms,
             them.time_remaining_ms AS opponent_time_remaining_ms,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
@@ -70,7 +70,7 @@ export default async function GamePage({
          ON xplayer.game_id = g.id AND xplayer.mark = 'X'
        JOIN game_players oplayer
          ON oplayer.game_id = g.id AND oplayer.mark = 'O'
-      WHERE (g.id::text = $1 OR g.game_number::text = $1) AND NOT g.idle_expired`,
+      WHERE (g.id::text = $1 OR g.game_number::text = $1) AND (NOT g.idle_expired OR g.status = 'won')`,
     [requestedId, session?.user.id ?? ""],
   ), pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true")]);
   if (!gameResult.rowCount) notFound();
@@ -189,7 +189,11 @@ export default async function GamePage({
   }
   if (game.status === "draw") summary = "Draw.";
   if (game.status === "won") {
-    if (game.resigned_by_id === game.opponent_id) {
+    if (game.idle_expired) {
+      summary = game.winner_id === viewerId
+        ? `${game.opponent_username} forfeited after 7 idle days. You won!`
+        : `You forfeited after 7 idle days. ${game.opponent_username} won.`;
+    } else if (game.resigned_by_id === game.opponent_id) {
       summary = `${game.opponent_username} resigned. You won!`;
     } else if (game.resigned_by_id === viewerId) {
       summary = `You resigned. ${game.opponent_username} won.`;
@@ -205,7 +209,7 @@ export default async function GamePage({
     summary = game.status === "active"
       ? `${currentName}’s turn${setupStage ? " to set up" : ""}.`
       : game.status === "won"
-        ? `${game.winner_id === xPlayerId ? game.my_username : game.opponent_username} won${game.resigned_by_id ? " by resignation" : ""}.`
+        ? `${game.winner_id === xPlayerId ? game.my_username : game.opponent_username} won${game.idle_expired ? " by idle forfeit" : game.resigned_by_id ? " by resignation" : ""}.`
         : game.status === "draw" ? "Draw." : game.status === "cancelled" ? "Cancelled." : "Waiting for players.";
   }
 

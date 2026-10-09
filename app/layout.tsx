@@ -53,7 +53,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="en">
       <body>
         <PwaRegistration userId={session?.user.id ?? null} />
-        <AppIconBadge initialCount={turnCount} />
+        {session && <AppIconBadge initialCount={turnCount} />}
         {session && <AppIconAlertPrompt />}
         <header>
           <Link className="brand" href="/">Shove Actually</Link>

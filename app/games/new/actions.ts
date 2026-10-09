@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { createGameRecord } from "@/lib/game-repository";
-import { sendTurnEmail } from "@/lib/turn-email";
+import { sendTurnNotification } from "@/lib/turn-email";
 
 export async function createGame(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -61,6 +61,6 @@ export async function createGame(formData: FormData) {
     client.release();
   }
 
-  await sendTurnEmail(gameId, firstPlayerId, "start");
+  await sendTurnNotification(gameId, firstPlayerId);
   redirect("/games");
 }

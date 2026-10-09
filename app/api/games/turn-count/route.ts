@@ -5,6 +5,7 @@ import { gamesWaitingForMove } from "@/lib/turn-count";
 
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
-  const count = session ? await gamesWaitingForMove(session.user.id) : 0;
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  const count = await gamesWaitingForMove(session.user.id);
   return NextResponse.json({ count }, { headers: { "Cache-Control": "no-store" } });
 }

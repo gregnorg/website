@@ -25,7 +25,7 @@ try {
                        ORDER BY m.move_number DESC LIMIT 1), g.created_at) <= now() - interval '3 days'
       ORDER BY g.created_at, g.id`,
   );
-  const counts = { skipped: 0, reminded: 0, cancelled: 0, failed: 0 };
+  const counts = { skipped: 0, reminded: 0, forfeited: 0, failed: 0 };
   for (const game of candidates.rows) {
     try {
       await client.query("BEGIN");
