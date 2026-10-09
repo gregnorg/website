@@ -158,7 +158,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .pf-board::before { content:''; position:absolute; inset:12px; background:linear-gradient(180deg, rgba(255,255,255,.14), transparent 35%, rgba(0,0,0,.15)); pointer-events:none; border-radius:18px; }
 .pf-board::after { content:''; position:absolute; inset:12px; background-image:radial-gradient(circle at 18% 18%, rgba(255,255,255,.16), transparent 18%), radial-gradient(circle at 82% 82%, rgba(0,0,0,.14), transparent 24%); pointer-events:none; border-radius:18px; mix-blend-mode:soft-light; }
 .pf-cell { position:relative; aspect-ratio:1; width:100%; padding:0; border:1.7px solid #12100d; border-radius:9px; background:#f0d095; box-shadow:inset 0 0 0 1px rgba(255,255,255,.24); color:var(--ink); cursor:pointer; display:grid; place-items:center; transition:transform .18s ease, background .18s ease, box-shadow .18s ease; overflow:hidden; }
-.pf-cell:hover { transform:translateY(-1px); background:#f3d69e; }
+.pf-cell:not(.pf-hole):hover { transform:translateY(-1px); background:#f3d69e; }
 .pf-cell.selected { background:#eed3a4; box-shadow:inset 0 0 0 2px rgba(0,0,0,.22); }
 .pf-cell.mine { outline:2px solid rgba(255,255,255,.55); }
 .pf-cell.theirs { outline:2px solid rgba(0,0,0,.35); }
