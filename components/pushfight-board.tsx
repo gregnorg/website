@@ -326,6 +326,20 @@ export default function PushfightBoard({
             </button>
           );
         }))}
+        <div className="pf-rails" aria-hidden="true" style={{ gridTemplateColumns: `repeat(${visualColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${visualRows}, minmax(0, 1fr))` }}>
+          {([
+            { start: { row: 0, col: 2 }, end: { row: 0, col: 6 }, edge: "up" },
+            { start: { row: 3, col: 1 }, end: { row: 3, col: 5 }, edge: "down" },
+          ] as const).map((rail) => {
+            const start = rotateCoord(rail.start, rotation);
+            const end = rotateCoord(rail.end, rotation);
+            const edge = rotateDirection(rail.edge, rotation);
+            return <span key={rail.edge} className={`pf-rail ${edge}`} style={{
+              gridRow: `${Math.min(start.row, end.row) + 1} / ${Math.max(start.row, end.row) + 2}`,
+              gridColumn: `${Math.min(start.col, end.col) + 1} / ${Math.max(start.col, end.col) + 2}`,
+            }} />;
+          })}
+        </div>
         {knockout && (
           <div
             key={knockout.id}

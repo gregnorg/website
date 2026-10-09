@@ -168,6 +168,14 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .pf-cell.legal-target { cursor:pointer; }
 .pf-legal-dot { position:absolute; width:8px; height:8px; border-radius:999px; background:#111; box-shadow:0 0 0 2px rgba(255,255,255,.45); z-index:3; pointer-events:none; }
 .pf-hole { background:transparent; box-shadow:none; border:none; cursor:default; }
+.pf-rails { position:absolute; inset:12px; display:grid; pointer-events:none; z-index:5; }
+.pf-rail { border:1px solid #24170e; border-radius:5px; background:linear-gradient(to bottom, #9a713f 0%, #6a4625 28%, #432c19 75%, #2c1c10 100%); box-shadow:inset 0 2px 1px #c49a61; }
+.pf-rail.up, .pf-rail.down { height:calc(13px / 3); }
+.pf-rail.up { align-self:start; transform:translateY(-50%); }
+.pf-rail.down { align-self:end; transform:translateY(50%); }
+.pf-rail.left, .pf-rail.right { width:calc(13px / 3); background:linear-gradient(to right, #9a713f 0%, #6a4625 28%, #432c19 75%, #2c1c10 100%); box-shadow:inset 2px 0 1px #c49a61; }
+.pf-rail.left { justify-self:start; transform:translateX(-50%); }
+.pf-rail.right { justify-self:end; transform:translateX(50%); }
 .pf-piece { display:inline-grid; place-items:center; transition:transform .15s ease; position:relative; }
 .pf-piece.square-piece { width:40px; height:40px; border-radius:10px; border:2px solid currentColor; box-shadow:inset 0 4px 10px rgba(255,255,255,.18), 0 3px 10px rgba(0,0,0,.25); }
 .pf-piece.circle-piece { width:36px; height:36px; border-radius:999px; border:2px solid currentColor; box-shadow:inset 0 4px 10px rgba(255,255,255,.18), 0 2px 6px rgba(0,0,0,.2); }
@@ -214,6 +222,10 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
   .pushfight-wrapper { gap:14px; padding:30px 22px 18px; border-radius:18px; }
   .pf-board { padding:5px; border-width:6px; border-radius:18px; }
   .pf-board::before, .pf-board::after { inset:5px; border-radius:10px; }
+  .pf-rails { inset:5px; }
+  .pf-rail { border-radius:3px; }
+  .pf-rail.up, .pf-rail.down { height:calc(8px / 3); }
+  .pf-rail.left, .pf-rail.right { width:calc(8px / 3); }
   .pf-axis-labels { font-size:10px; letter-spacing:0; }
   .pf-column-labels { left:5px; right:5px; }
   .pf-column-labels.top { top:-22px; }
