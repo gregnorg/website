@@ -132,6 +132,11 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - When a game is won, only the losing player receives an idempotent result email
   identifying the winner and linking directly to the finished game. Draws and
   cancellations do not send result emails.
+- When the crown changes hands, every registered user receives a celebratory
+  announcement naming the new champion and previous holder, with a rankings link.
+  The announcement queues in the same transaction as the transfer and sends
+  after commit; failed sends retry through the hourly idle-game job. Initial
+  coronation and wins against someone without the crown do not announce a transfer.
 - Idle-game emails are mandatory: remind the player whose turn it is after 3 days
   without a submitted move, then daily on days 4–6. At 7 days the idle player
   forfeits, awarding a normal loss and opponent win (including championship

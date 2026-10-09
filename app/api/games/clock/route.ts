@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { sendCrownAnnouncements } from "@/lib/crown-email";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -99,6 +101,7 @@ export async function POST(request: Request) {
       timedOut = true;
     }
     await client.query("COMMIT");
+    after(sendCrownAnnouncements);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

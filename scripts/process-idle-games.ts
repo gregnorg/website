@@ -1,3 +1,4 @@
+import { sendCrownAnnouncements } from "../lib/crown-email.ts";
 import { Resend } from "resend";
 import { pool } from "../lib/db.ts";
 import { processIdleGame, type IdleReminder } from "../lib/idle-games.ts";
@@ -42,5 +43,6 @@ try {
   if (counts.failed) process.exitCode = 1;
 } finally {
   client.release();
+  if (!dryRun) await sendCrownAnnouncements();
   await pool.end();
 }

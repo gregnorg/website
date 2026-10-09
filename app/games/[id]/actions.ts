@@ -1,5 +1,8 @@
 "use server";
 
+import { after } from "next/server";
+import { sendCrownAnnouncements } from "@/lib/crown-email";
+
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -25,6 +28,7 @@ export async function resignGame(formData: FormData) {
     await client.query("BEGIN");
     resigned = await resignGameForPlayer(client, gameId, session.user.id);
     await client.query("COMMIT");
+    after(sendCrownAnnouncements);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -130,6 +134,7 @@ export async function makeMove(formData: FormData) {
           );
         }
         await client.query("COMMIT");
+        after(sendCrownAnnouncements);
         if (winningMark) {
           await sendGameEndedEmail(gameId, `move-${moves.rows.length + 1}`);
         } else if (!isDraw(nextBoard)) {
@@ -238,6 +243,7 @@ export async function makeMove(formData: FormData) {
           await client.query("UPDATE games SET updated_at = now() WHERE id = $1", [gameId]);
         }
         await client.query("COMMIT");
+        after(sendCrownAnnouncements);
         if (result.winner) {
           await sendGameEndedEmail(gameId, `move-${moves.rows.length + 1}`);
         } else {
@@ -296,6 +302,7 @@ export async function manageDrawOffer(formData: FormData) {
       ? await offerDrawForPlayer(client, gameId, session.user.id)
       : await respondToDrawForPlayer(client, gameId, session.user.id, offerId, response);
     await client.query("COMMIT");
+    after(sendCrownAnnouncements);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

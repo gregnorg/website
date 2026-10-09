@@ -70,3 +70,13 @@ CREATE TABLE champion_state (
   user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   crowned_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE crown_announcements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  winner_name TEXT NOT NULL,
+  previous_name TEXT NOT NULL,
+  recipients JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_at TIMESTAMPTZ
+);
+CREATE INDEX crown_announcements_pending_idx ON crown_announcements(created_at) WHERE sent_at IS NULL;
