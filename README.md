@@ -171,8 +171,5 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 ## Top-level scripts
 
 - `scripts/apply-migration.js` — helper for applying DB schema migrations from `.env.local`
-- `scripts/purge_games.sql` — SQL to delete game-related rows
-- `scripts/purge_games.sh` — wrapper to run `purge_games.sql` using `psql`
-- `scripts/purge_all_games.sql` — SQL to delete all games, game_players, and moves while preserving user accounts
-- `scripts/purge_all_games.sh` — wrapper to run `purge_all_games.sql` using `psql`
-- `scripts/purge_all_games_envlocal.sh` — wrapper that sources `.env.local` and runs `scripts/purge_all_games.sh`
+
+Games and their complete ordered move histories (including Pushfight setups and all actions in submitted turns) are retained permanently. Clearing a finished game only hides it from that player’s list. Leaderboards include results from the last 30 days; older games remain stored. Admin account deletion is available only for accounts without game history.

@@ -99,6 +99,30 @@ test("game database operations enforce membership and finished-game clearing", a
   assert.equal(champion.rows[0].user_id, creatorId);
   assert.equal(await resignGameForPlayer(client, resignationGameId, opponentId), false);
 
+  await t.test("old games retain ordered moves after clearing and fall out of leaderboards", async () => {
+    const id = await createGameRecord(client, creatorId, opponentId, "tic_tac_toe", "X");
+    for (const [index, position] of [0, 3, 1, 4, 2].entries()) {
+      await client.query(
+        "INSERT INTO moves (game_id, player_id, position, move_number) VALUES ($1, $2, $3, $4)",
+        [id, index % 2 === 0 ? creatorId : opponentId, position, index + 1],
+      );
+    }
+    const before = await getLeaderboards(client);
+    await client.query(
+      "UPDATE games SET status = 'won', winner_id = $2, updated_at = now() - interval '31 days' WHERE id = $1",
+      [id, creatorId],
+    );
+    assert.equal(await clearFinishedGameForPlayer(client, id, creatorId), true);
+    assert.equal(await clearFinishedGameForPlayer(client, id, opponentId), true);
+    const history = await client.query("SELECT position, move_number FROM moves WHERE game_id = $1 ORDER BY move_number", [id]);
+    assert.deepEqual(history.rows, [0, 3, 1, 4, 2].map((position, index) => ({ position, move_number: index + 1 })));
+    assert.equal((await client.query("SELECT status FROM games WHERE id = $1", [id])).rows[0].status, "won");
+    const after = await getLeaderboards(client);
+    for (const playerId of [creatorId, opponentId]) {
+      assert.deepEqual(after.byWins.find(p => p.id === playerId), before.byWins.find(p => p.id === playerId));
+    }
+  });
+
   await t.test("draw offers require opponent consent and ignore stale responses", async () => {
     const drawGame = await createGameRecord(client, creatorId, opponentId, "pushfight", "X");
     const pendingOffer = async () => (await client.query<{ draw_offer_id: string }>(
