@@ -19,14 +19,18 @@ export default async function Home() {
 
   return (
     <section className="center hero">
-      <div className="home-pushfight" role="img" aria-label="Pushfight board with black and white pieces">
+      <div className="home-pushfight pf-board" role="img" aria-label="Pushfight board with black and white pieces">
         {pushfightPreview.flatMap((row, rowIndex) => row.map((cell, colIndex) => (
-          <span key={`${rowIndex}-${colIndex}`} className={`home-pf-cell${cell === "invalid" ? " home-pf-hole" : ""}`}>
+          <span key={`${rowIndex}-${colIndex}`} className={`pf-cell${cell === "invalid" ? " pf-hole" : ""}`}>
             {cell !== "empty" && cell !== "invalid" ? (
               <span className={`pf-piece ${cell.endsWith("circle") ? "circle-piece" : "square-piece"} ${cell.startsWith("white") ? "white-piece" : "black-piece"}${cell.endsWith("anchor") ? " anchor-piece" : ""}`} />
             ) : null}
           </span>
         )))}
+        <div className="pf-rails" aria-hidden="true" style={{ gridTemplateColumns: "repeat(8, minmax(0, 1fr))", gridTemplateRows: "repeat(4, minmax(0, 1fr))" }}>
+          <span className="pf-rail up" style={{ gridRow: "1 / 2", gridColumn: "3 / 8" }} />
+          <span className="pf-rail down" style={{ gridRow: "4 / 5", gridColumn: "2 / 7" }} />
+        </div>
       </div>
       <h1>It’s okay to be pushy.</h1>
       <section className="home-leaders" aria-label="Leaders">
