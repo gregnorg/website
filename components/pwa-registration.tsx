@@ -13,11 +13,22 @@ export function PwaRegistration({ userId }: { userId: string | null }) {
       .catch(error => console.error("Service worker registration failed:", error));
 
     async function repairSubscription() {
-      if (!userId || disposed || inFlight || document.visibilityState !== "visible" || Date.now() - lastSaved < 60_000) return;
+      if (localStorage.getItem("push-alerts-disabled") || !userId || disposed || inFlight || document.visibilityState !== "visible" || Date.now() - lastSaved < 60_000) return;
       inFlight = true;
       try {
         const registration = await registrationPromise;
-        const subscription = await registration.pushManager.getSubscription();
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription && "Notification" in window && Notification.permission === "granted") {
+          const keyResponse = await fetch("/api/push/public-key", { cache: "no-store" });
+          if (!keyResponse.ok) return;
+          const { publicKey } = await keyResponse.json() as { publicKey: string };
+          const encoded = publicKey.replace(/-/g, "+").replace(/_/g, "/");
+          const bytes = atob(encoded + "=".repeat((4 - encoded.length % 4) % 4));
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: Uint8Array.from(bytes, character => character.charCodeAt(0)),
+          });
+        }
         if (!subscription || disposed) return;
         const response = await fetch("/api/push/subscriptions", {
           method: "POST",

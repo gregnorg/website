@@ -1,0 +1,11 @@
+[Unit]
+Description=Monitor push delivery independently every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+AccuracySec=5s
+Unit=shoveactually-push-monitor.service
+
+[Install]
+WantedBy=timers.target

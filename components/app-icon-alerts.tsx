@@ -45,11 +45,13 @@ export function AppIconAlerts() {
       const registration = await navigator.serviceWorker.ready;
       const existing = await registration.pushManager.getSubscription();
       if (enabled && existing) {
-        await fetch("/api/push/subscriptions", {
+        localStorage.setItem("push-alerts-disabled", "1");
+        const response = await fetch("/api/push/subscriptions", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ endpoint: existing.endpoint }),
         });
+        if (!response.ok) throw new Error("Could not turn off app icon alerts.");
         await existing.unsubscribe();
         setEnabled(false);
         setMessage("App icon alerts are off on this device.");
@@ -70,6 +72,7 @@ export function AppIconAlerts() {
       });
       const response = await saveSubscription(subscription);
       if (!response.ok) throw new Error("Could not enable app icon alerts.");
+      localStorage.removeItem("push-alerts-disabled");
       setEnabled(true);
       await refreshAppBadge();
       setMessage("App icon alerts are on for this device.");

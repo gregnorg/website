@@ -1,0 +1,11 @@
+[Unit]
+Description=Check pending turn notifications every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=5s
+Unit=shoveactually-push.service
+
+[Install]
+WantedBy=timers.target

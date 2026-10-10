@@ -38,6 +38,12 @@ export async function POST(request: Request) {
            updated_at = now()`,
     [endpoint, session.user.id, p256dh, authKey],
   );
+  // New or restored devices receive the current turn even if its original job
+  // ran while there was no subscription. Delivery uniqueness prevents repeats.
+  await pool.query(`INSERT INTO turn_notification_jobs(game_id)
+    SELECT g.id FROM games g JOIN game_players p ON p.game_id=g.id
+    WHERE g.status='active' AND p.user_id=$1
+    ON CONFLICT(game_id) DO NOTHING`, [session.user.id]);
   return NextResponse.json({ ok: true });
 }
 

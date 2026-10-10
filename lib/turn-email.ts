@@ -1,38 +1,15 @@
 import { Resend } from "resend";
 import { pool } from "@/lib/db";
-import { sendPushNotification } from "@/lib/push-notifications";
-import { gamesWaitingForMove } from "@/lib/turn-count";
+import { prepareTurnNotifications, deliverPendingPushes } from "@/lib/push-notifications";
 
-export async function sendTurnNotification(gameId: string, recipientId: string) {
+export async function sendTurnNotification(gameId: string, _recipientId: string) {
   try {
-    await sendTurnNotificationUnsafe(gameId, recipientId);
+    await prepareTurnNotifications(gameId);
+    await deliverPendingPushes(gameId);
   } catch (error) {
+    // The durable job remains available for the independent retry worker.
     console.error("Turn notification failed:", error instanceof Error ? error.message : error);
   }
-}
-
-async function sendTurnNotificationUnsafe(gameId: string, recipientId: string) {
-  const result = await pool.query<{ email: string; username: string; opponent: string; game_type: string }>(
-    `SELECT me.email, me.username, opponent.username AS opponent, g.game_type
-       FROM games g
-       JOIN game_players mine ON mine.game_id = g.id AND mine.user_id = $2
-       JOIN "user" me ON me.id = mine.user_id
-       JOIN game_players theirs ON theirs.game_id = g.id AND theirs.user_id <> mine.user_id
-       JOIN "user" opponent ON opponent.id = theirs.user_id
-      WHERE g.id = $1 AND g.status = 'active'`,
-    [gameId, recipientId],
-  );
-  const recipient = result.rows[0];
-  if (!recipient) return;
-
-  const gameName = recipient.game_type === "pushfight" ? "Push Fight" : "Tic-tac-toe";
-  await sendPushNotification(recipientId, {
-    title: `Your turn against ${recipient.opponent}`,
-    body: `It is your turn in ${gameName}.`,
-    url: `/games/${gameId}`,
-    tag: `turn-${gameId}`,
-    badgeCount: await gamesWaitingForMove(recipientId),
-  });
 }
 
 export async function sendGameEndedEmail(gameId: string, eventKey: string) {

@@ -1,5 +1,5 @@
-import { pool } from "@/lib/db";
-import { currentPlayerId, type GameType } from "@/lib/game-state";
+import { pool } from "./db.ts";
+import { currentPlayerId, type GameType } from "./game-state.ts";
 
 export async function gamesWaitingForMove(userId: string) {
   const result = await pool.query<{

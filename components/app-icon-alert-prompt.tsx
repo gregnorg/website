@@ -26,7 +26,8 @@ export function AppIconAlertPrompt() {
       || !("Notification" in window)
       || !("serviceWorker" in navigator)
       || !("PushManager" in window)
-      || Notification.permission !== "default"
+      || Notification.permission === "denied"
+      || localStorage.getItem("push-alerts-disabled")
       || localStorage.getItem(DISMISSED_KEY)) return;
 
     navigator.serviceWorker.ready
@@ -64,6 +65,7 @@ export function AppIconAlertPrompt() {
         body: JSON.stringify(subscription),
       });
       if (!response.ok) throw new Error("Could not enable app icon alerts.");
+      localStorage.removeItem("push-alerts-disabled");
       await refreshAppBadge();
       setVisible(false);
     } catch (error) {

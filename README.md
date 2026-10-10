@@ -123,12 +123,27 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
   cannot be exceeded.
 - New games and submitted moves send browser push notifications to registered
   devices, without turn emails. Notification failures never roll back game state.
+  Turn jobs commit with game changes. A separate minute timer retries temporary
+  delivery failures with bounded backoff; old turns are superseded and each
+  device receives one queued delivery per turn. `push_deliveries` records attempts,
+  errors and provider acceptance (acceptance does not confirm device display).
+  An independent five-minute monitor emails site admins about permanent failures,
+  jobs queued over 10 minutes, deliveries pending over 15 minutes, and a worker
+  without a successful run in 20 minutes. It repeats continuing incidents hourly
+  and sends a recovery message for queue/worker incidents. Monitoring email failures
+  remain retryable. `PUSH_MONITOR_EMAIL` stores the admin fallback destination so
+  checks can still report database failures; configure it again if admins change.
+  Inspect `journalctl -u shoveactually-push-monitor.service` for monitor failures.
+  Install both timers with `sudo bash deploy/install-push.sh` after building and
+  migrating. Inspect `journalctl -u shoveactually-push.service` for failures.
   Gameplay remains online-only.
 - App-icon badges refresh immediately after enabling alerts, on focus and return,
   and every 30 seconds while the app is visible. Push payloads include a native
   iOS badge count and legacy fields for older installed workers. Optional badge
   API errors cannot prevent a visible notification. Existing subscriptions are
-  repaired when signed-in apps return or regain a connection.
+  repaired when signed-in apps return or regain a connection. Missing browser
+  subscriptions are recreated with previously granted permission, unless the
+  user explicitly turned alerts off on that device.
 - When a game is won, only the losing player receives an idempotent result email
   identifying the winner and linking directly to the finished game. Draws and
   cancellations do not send result emails.
