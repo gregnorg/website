@@ -83,14 +83,13 @@ export default function GameChat({ gameId }: { gameId: string }) {
   if (signedOut) return null;
   return (
     <section className="game-chat" aria-labelledby="game-chat-heading">
-      <h2 id="game-chat-heading">Game chat</h2>
-      <p className="game-chat-note">Everyone signed in can read and join this conversation.</p>
+      <h2 id="game-chat-heading" title="All signed-in users can read and post">Chat</h2>
       <div className="game-chat-messages" ref={list} role="log" aria-label="Chat messages" aria-live="polite" tabIndex={0}
         onScroll={() => {
           const element = list.current;
           if (element) stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 60;
         }}>
-        {!loaded ? <p className="game-chat-note">Loading chat…</p> : messages.length === 0 ? <p className="game-chat-note">No messages yet. Start the conversation!</p> : messages.map((message) => (
+        {!loaded ? <p className="game-chat-note">Loading…</p> : messages.length === 0 ? <p className="game-chat-note">No messages yet.</p> : messages.map((message) => (
           <div className="game-chat-message" key={message.id}>
             <div className="game-chat-meta"><strong>{message.username}</strong><time dateTime={message.created_at} title={new Date(message.created_at).toLocaleString()}>{new Date(message.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>
             <p>{message.body}</p>
@@ -98,9 +97,8 @@ export default function GameChat({ gameId }: { gameId: string }) {
         ))}
       </div>
       <form onSubmit={send} className="game-chat-form">
-        <label htmlFor="game-chat-draft">Message</label>
-        <textarea id="game-chat-draft" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} rows={2} required disabled={sending} placeholder="Say something about the game…" />
-        <div className="game-chat-send"><span className="game-chat-note">{draft.length}/1,000</span><button className="button small" type="submit" disabled={sending || !draft.trim()}>{sending ? "Sending…" : "Send"}</button></div>
+        <input id="game-chat-draft" aria-label="Chat message" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} required disabled={sending} placeholder="Message…" />
+        <button className="button small" type="submit" disabled={sending || !draft.trim()}>{sending ? "Sending…" : "Send"}</button>
       </form>
       {error && <p className="error" role="alert">{error}</p>}
     </section>

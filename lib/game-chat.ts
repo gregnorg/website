@@ -1,5 +1,16 @@
 import type { PoolClient } from "pg";
 
+export function isChatOriginAllowed(request: Request): boolean {
+  if (request.headers.get("sec-fetch-site") === "cross-site") return false;
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  // The HTTPS tunnel forwards to an HTTP server on loopback. Its request URL
+  // does not necessarily contain the browser's public origin.
+  return origin === "https://shoveactually.com"
+    || origin === "https://www.shoveactually.com"
+    || origin === new URL(request.url).origin;
+}
+
 export function validateChatMessage(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const body = value.trim();

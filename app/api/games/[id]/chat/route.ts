@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
-import { saveChatMessage, validateChatMessage } from "@/lib/game-chat";
+import { isChatOriginAllowed, saveChatMessage, validateChatMessage } from "@/lib/game-chat";
 
 type Context = { params: Promise<{ id: string }> };
 const privateHeaders = { "Cache-Control": "private, no-store" };
@@ -34,8 +34,7 @@ export async function GET(_request: Request, context: Context) {
 
 export async function POST(request: Request, context: Context) {
   // Reject cross-site form submissions as well as cross-origin fetches.
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return reply({ error: "Invalid origin." }, 403);
+  if (!isChatOriginAllowed(request)) return reply({ error: "Invalid origin." }, 403);
   if (!request.headers.get("content-type")?.includes("application/json")) return reply({ error: "Invalid request." }, 400);
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return reply({ error: "Sign in to post in chat." }, 401);

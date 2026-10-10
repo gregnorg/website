@@ -2,7 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { pool } from "../lib/db.ts";
-import { saveChatMessage, validateChatMessage } from "../lib/game-chat.ts";
+import { isChatOriginAllowed, saveChatMessage, validateChatMessage } from "../lib/game-chat.ts";
+
+test("chat accepts the public HTTPS origin behind an HTTP proxy and rejects other sites", () => {
+  const request = (origin?: string, site?: string) => new Request("http://127.0.0.1:3000/api/games/1/chat", {
+    headers: { ...(origin ? { origin } : {}), ...(site ? { "sec-fetch-site": site } : {}) },
+  });
+  assert.equal(isChatOriginAllowed(request("https://shoveactually.com", "same-origin")), true);
+  assert.equal(isChatOriginAllowed(request("https://www.shoveactually.com")), true);
+  assert.equal(isChatOriginAllowed(request("http://127.0.0.1:3000")), true);
+  assert.equal(isChatOriginAllowed(request()), true);
+  for (const origin of ["https://other.example", "https://shoveactually.com.other.example", "null", "http://shoveactually.com"]) {
+    assert.equal(isChatOriginAllowed(request(origin)), false);
+  }
+  assert.equal(isChatOriginAllowed(request("https://shoveactually.com", "cross-site")), false);
+});
 
 test("chat validates empty, oversized, and non-text messages", () => {
   for (const body of [null, undefined, 42, {}, "", " \n\t ", "a".repeat(1001)]) {
