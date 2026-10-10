@@ -2,6 +2,19 @@
 
 A deliberately simple asynchronous board-game site. The first playable game is tic-tac-toe; the long-term goal is Push Fight.
 
+## Timed games
+
+For players in active timed games, the game page does not refresh automatically,
+including when returning to the tab or window. Use the browser's refresh when
+ready to see the opponent's move; there is no extra refresh button on the page.
+Opening or manually refreshing the page on your turn starts the clock after a
+10-second grace period. The clock counts time only while the page is visible
+and pauses during Push Fight setup. Leaving a visible page open on your turn
+still uses your time.
+
+Untimed games and spectators retain automatic game-page updates. Chat and
+app-icon badge updates continue independently in timed games.
+
 ## Blank Linux Mint installation
 
 Copy or clone this repository onto the new machine, then create a remotely
@@ -117,6 +130,27 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 - `npm start` — production server on loopback for the local reverse proxy/tunnel
 
 ## Production operations
+
+### Engage workflow
+
+When working with Codex in this repository, "Engage" authorizes building the
+completed changes, restarting production, committing the changes, and pushing
+to `main`. Run appropriate checks before deployment and verify
+`GET /api/health` after restarting. Keep unrelated edits out of the release
+unless they are included in the requested scope. Commit each completed new
+feature to `main`.
+
+The current production host grants passwordless sudo for this exact restart
+command:
+
+```sh
+sudo -n /usr/bin/systemctl restart shoveactually
+```
+
+That permission does not cover separate stop/start commands or a service name
+with the `.service` suffix. Project instructions are stored in `AGENTS.md`.
+
+### Services and game operations
 
 - Public registration is always available until the database reaches its hard
   limit of 50 users. The database serializes concurrent signups so the limit
