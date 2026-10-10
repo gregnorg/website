@@ -82,8 +82,7 @@ export default function GameChat({ gameId }: { gameId: string }) {
 
   if (signedOut) return null;
   return (
-    <section className="game-chat" aria-labelledby="game-chat-heading">
-      <h2 id="game-chat-heading" title="All signed-in users can read and post">Chat</h2>
+    <section className="game-chat" aria-label="Game conversation">
       <div className="game-chat-messages" ref={list} role="log" aria-label="Chat messages" aria-live="polite" tabIndex={0}
         onScroll={() => {
           const element = list.current;
@@ -91,8 +90,9 @@ export default function GameChat({ gameId }: { gameId: string }) {
         }}>
         {!loaded ? <p className="game-chat-note">Loading…</p> : messages.length === 0 ? <p className="game-chat-note">No messages yet.</p> : messages.map((message) => (
           <div className="game-chat-message" key={message.id}>
-            <div className="game-chat-meta"><strong>{message.username}</strong><time dateTime={message.created_at} title={new Date(message.created_at).toLocaleString()}>{new Date(message.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>
-            <p>{message.body}</p>
+            <strong>{message.username}</strong>{" "}
+            <time dateTime={message.created_at} title={new Date(message.created_at).toLocaleString()}>{new Date(message.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>{" "}
+            <span>{message.body}</span>
           </div>
         ))}
       </div>
