@@ -1,6 +1,9 @@
 # Shove Actually
 
-A deliberately simple asynchronous board-game site. The first playable game is tic-tac-toe; the long-term goal is Push Fight.
+A deliberately simple asynchronous Push Fight site built with Next.js and
+PostgreSQL. Registered players can challenge one another to untimed games or
+games with 5, 10, or 20 minutes per player (5 minutes by default). The site
+includes game chat, spectating, move replays, rankings, and a championship crown.
 
 ## Timed games
 
@@ -28,16 +31,27 @@ sudo ./setup-linux-mint.sh
 
 The script securely prompts for the Cloudflare token. It installs PostgreSQL,
 Node.js 24, cloudflared, dependencies, database schemas and migrations,
-production services, automatic updates, health monitoring, and daily backups.
+production services, daily cloudflared update checks, health monitoring, and daily backups.
 Database and authentication secrets are generated automatically. It then builds
 and starts Shove Actually and performs a real backup/restore test.
 
-The script is safe to rerun: it preserves an existing `.env.local`, database,
-and tunnel token while updating packages, migrations, builds, and services.
+On an existing installation, the script preserves `.env.local` and the tunnel
+token, skips the base game schema when game tables already exist, and applies
+pending migrations before rebuilding and restarting services. It does not pull
+new application source from Git. This is a full host setup command requiring
+administrator access, rather than the routine deployment workflow below.
+
+The setup script defaults to `https://shoveactually.com`. For a different
+hostname, update `PUBLIC_SITE_URL` in `.env.local` and the production host
+allowlist in `lib/auth.ts`. Configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL`
+with a verified sender for password resets and game/admin emails; the setup
+script leaves those values blank unless supplied.
 
 ## Local setup
 
-Everything, including PostgreSQL, runs inside the Ubuntu WSL instance.
+For development on Linux Mint or Ubuntu, run Node.js and PostgreSQL locally.
+On Windows, run both inside WSL. Production currently runs on Linux Mint with
+systemd and a Cloudflare Tunnel.
 
 Install the system packages:
 
@@ -65,15 +79,21 @@ CREATE DATABASE turntable OWNER turntable;
 Then set up the application:
 
 1. Install Node.js 24 LTS inside Ubuntu (not only on Windows).
-2. Run `npm install`.
+2. Run `npm ci` to install the versions in the lockfile.
 3. Copy `.env.example` to `.env.local` and set the same local database password.
 4. Generate `BETTER_AUTH_SECRET` with `openssl rand -base64 32`.
-5. Run `npx auth@latest migrate` to create the authentication tables.
-6. Run `psql "$DATABASE_URL" -f database/schema.sql` after exporting the URL,
-   or pass the URL from `.env.local` directly to `psql`.
+5. Export `DATABASE_URL` and `BETTER_AUTH_SECRET` in the shell with the same
+   values as `.env.local`, then run `npx auth@latest migrate --yes` to create
+   the authentication tables. This matches the full setup script's environment.
+6. For a **new database only**, run
+   `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/schema.sql`.
 7. Run `npm run migrate` to apply any migrations added after the base schema.
-8. Run `npm run setup:push` once to generate browser-notification signing keys.
-9. Run `npm run dev` and open `http://localhost:3000` in Windows.
+8. Remove the placeholder `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and
+   `VAPID_SUBJECT` lines copied from `.env.example`, then run
+   `npm run setup:push` to generate browser-notification signing keys. The helper
+   leaves existing nonempty key values unchanged, including placeholders.
+9. For local links, set `PUBLIC_SITE_URL=http://localhost:3000` in `.env.local`.
+   Run `npm run dev` and open `http://localhost:3000` in your browser.
 
 The local connection should resemble:
 
@@ -90,24 +110,27 @@ sudo service postgresql start
 The development server listens on `0.0.0.0`. The production server listens on
 `127.0.0.1` and is intended to be reached through the local Cloudflare Tunnel.
 
-## Host from WSL
+## Production hosting
 
 For a production-style server:
 
 ```sh
 npm ci
+npm run migrate
 npm run build
 npm start
 ```
 
-For public hosting, install the service files under `deploy/` so the application
-and database backups survive reboots without an open terminal.
+This assumes the database and `.env.local` are already initialized. On the
+Linux Mint production host, the full setup script installs the services. To
+reinstall service definitions on an already configured host, use:
 
 ```sh
 sudo ./deploy/install-production.sh
 ```
 
-To make the site available to other devices on the same network:
+For development hosted from WSL, making the site available to other devices on
+the same network may also require:
 
 1. Allow inbound TCP port 3000 in Windows Defender Firewall.
 2. If your WSL version does not use mirrored networking, create a Windows
@@ -120,7 +143,7 @@ internet hosting, put the production server behind HTTPS and a reverse proxy.
 ## Commands
 
 - `npm run dev` — development server on all network interfaces
-- `npm test` — game-rule tests
+- `npm test` — automated tests, including game rules, repositories, and notifications
 - `npm run lint` — lint checks
 - `npm run build` — production build
 - `npm run migrate` — apply pending database migrations
@@ -199,6 +222,9 @@ with the `.service` suffix. Project instructions are stored in `AGENTS.md`.
   journal every five minutes.
 - `deploy/shoveactually-backup.timer` creates and validates daily PostgreSQL dumps,
   retaining 30 days in `/var/backups/turntable`.
+- `deploy/shoveactually-idle-games.timer` processes idle games hourly.
+- `deploy/cloudflared-update.timer` checks for cloudflared package updates daily;
+  it does not update application source.
 - `scripts/test-backup-restore.sh` restores the newest dump into a disposable
   database, verifies core tables, and removes the disposable database.
 
