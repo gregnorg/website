@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export default function RefreshOnReturn({ poll = false }: { poll?: boolean }) {
+export default function RefreshOnReturn({ poll = false, automatic = true }: { poll?: boolean; automatic?: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
+    if (!automatic) return;
+
     let lastRefresh = 0;
     const refresh = () => {
       const now = Date.now();
@@ -26,7 +28,7 @@ export default function RefreshOnReturn({ poll = false }: { poll?: boolean }) {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [router, poll]);
+  }, [router, poll, automatic]);
 
   return null;
 }
