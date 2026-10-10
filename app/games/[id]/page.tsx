@@ -20,6 +20,7 @@ import {
 } from "@/lib/game-state";
 import RefreshOnReturn from "@/components/refresh-on-return";
 import { GameClocks } from "@/components/game-clocks";
+import GameChat from "@/components/game-chat";
 
 export const dynamic = "force-dynamic";
 
@@ -309,6 +310,7 @@ export default async function GamePage({
           </div>
         </>
       )}
+      {session && <GameChat gameId={id} />}
     </section>
   );
 }
