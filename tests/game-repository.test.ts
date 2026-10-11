@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { pool } from "../lib/db.ts";
 import {
   clearFinishedGameForPlayer,
+  MY_GAME_FINISHED_SQL,
   createGameRecord,
   getMoveGameForPlayer,
   resignGameForPlayer,
@@ -81,6 +82,36 @@ test("game database operations enforce membership and finished-game clearing", a
   );
   assert.ok(cleared.rows.find((row) => row.user_id === creatorId)?.cleared_at instanceof Date);
   assert.equal(cleared.rows.find((row) => row.user_id === opponentId)?.cleared_at, null);
+
+  await t.test("My Games keeps losses active until individually marked finished", async () => {
+    const id = await createGameRecord(client, creatorId, opponentId, "tic_tac_toe", "X");
+    const isFinishedFor = async (playerId: string) => {
+      const result = await client.query<{ finished: boolean }>(
+        `SELECT ${MY_GAME_FINISHED_SQL} AS finished FROM games g
+         JOIN game_players me ON me.game_id = g.id
+         WHERE g.id = $1 AND me.user_id = $2`, [id, playerId],
+      );
+      return result.rows[0].finished;
+    };
+    assert.equal(await isFinishedFor(creatorId), false);
+    assert.equal(await isFinishedFor(opponentId), false);
+    assert.equal(await clearFinishedGameForPlayer(client, id, opponentId), false);
+    await client.query("UPDATE games SET status = 'won', winner_id = $2 WHERE id = $1", [id, creatorId]);
+    assert.equal(await isFinishedFor(creatorId), true);
+    assert.equal(await isFinishedFor(opponentId), false);
+    assert.equal(await clearFinishedGameForPlayer(client, id, outsiderId), false);
+    assert.equal(await isFinishedFor(opponentId), false);
+    assert.equal(await clearFinishedGameForPlayer(client, id, opponentId), true);
+    assert.equal(await isFinishedFor(opponentId), true);
+    assert.equal(await isFinishedFor(creatorId), true);
+    assert.equal((await client.query("SELECT status, winner_id FROM games WHERE id = $1", [id])).rows[0].winner_id, creatorId);
+    for (const status of ["draw", "cancelled"]) {
+      await client.query("UPDATE games SET status = $2, winner_id = NULL WHERE id = $1", [id, status]);
+      await client.query("UPDATE game_players SET cleared_at = NULL WHERE game_id = $1", [id]);
+      assert.equal(await isFinishedFor(creatorId), true);
+      assert.equal(await isFinishedFor(opponentId), true);
+    }
+  });
 
   const resignationGameId = await createGameRecord(client, creatorId, opponentId, "tic_tac_toe", "X");
   await client.query(

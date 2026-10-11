@@ -129,3 +129,7 @@ export async function respondToDrawForPlayer(
   );
   return result.rowCount === 1;
 }
+
+// My Games keeps an unacknowledged loss active for the losing player.
+export const MY_GAME_FINISHED_SQL = `(g.status IN ('won', 'draw', 'cancelled')
+  AND (g.status <> 'won' OR g.winner_id = me.user_id OR me.cleared_at IS NOT NULL))`;

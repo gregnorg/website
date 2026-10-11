@@ -4,14 +4,18 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { gameStatusLabel } from "@/lib/game";
-import { clearFinishedGame } from "./actions";
+import { MY_GAME_FINISHED_SQL } from "@/lib/game-repository";
+import { markGameAsFinished } from "./actions";
 import { currentPlayerId, type GameStatus, type GameType, type PlayerMark } from "@/lib/game-state";
 import RefreshOnReturn from "@/components/refresh-on-return";
 import { ChampionCrown } from "@/components/champion-crown";
 
 export const dynamic = "force-dynamic";
 
-export default async function GamesPage() {
+export default async function GamesPage({ searchParams }: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const finished = (await searchParams).status === "finished";
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
   const [result, championResult] = await Promise.all([pool.query<{
@@ -52,10 +56,10 @@ export default async function GamesPage() {
          ON oplayer.game_id = g.id AND oplayer.mark = 'O'
        LEFT JOIN moves m
          ON m.game_id = g.id
-      WHERE me.cleared_at IS NULL
+      WHERE ${MY_GAME_FINISHED_SQL} = $2
       GROUP BY g.id, me.mark, xplayer.user_id, oplayer.user_id, opponent.id, opponent.username
       ORDER BY g.updated_at DESC`,
-    [session.user.id],
+    [session.user.id, finished],
   ), pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true")]);
   const championId = championResult.rows[0]?.user_id;
   const games = result.rows
@@ -76,15 +80,19 @@ export default async function GamesPage() {
 
   return (
     <section className="page">
-      <RefreshOnReturn />
+      <RefreshOnReturn poll={!finished} />
       <div className="page-heading">
         <div><p className="kicker">Your games</p><h1>My Games</h1></div>
         <Link className="button" href="/games/new">New game</Link>
       </div>
+      <nav className="browse-filters" aria-label="Game status">
+        <Link className={`button ${!finished ? "" : "secondary"}`} aria-current={!finished ? "page" : undefined} href="/games?status=active">Active</Link>
+        <Link className={`button ${finished ? "" : "secondary"}`} aria-current={finished ? "page" : undefined} href="/games?status=finished">Finished</Link>
+      </nav>
       {games.length ? (
         <div className="game-list">
           {games.map((game) => {
-            const isFinished = ["won", "draw", "cancelled"].includes(game.status);
+            const needsAcknowledgment = !finished && game.status === "won" && game.winner_id !== session.user.id;
             const timeControl = game.time_control_seconds === null
               ? "Untimed"
               : `Timed · ${game.time_control_seconds / 60} minutes per player`;
@@ -119,11 +127,11 @@ export default async function GamesPage() {
                       : gameStatusLabel(game.status, game.winner_id, session.user.id, game.isPlayersTurn)}
                 </span>
               </Link>
-              {isFinished && (
-                <form action={clearFinishedGame} className="clear-game-form">
+              {needsAcknowledgment && (
+                <form action={markGameAsFinished} className="clear-game-form">
                   <input type="hidden" name="gameId" value={game.id} />
-                  <button className="clear-game-button" type="submit" aria-label={`Clear game against ${game.opponent_username}`}>
-                    Clear
+                  <button className="clear-game-button" type="submit" aria-label={`Mark game against ${game.opponent_username} as finished`}>
+                    Mark as Finished
                   </button>
                 </form>
               )}
@@ -131,7 +139,7 @@ export default async function GamesPage() {
           })}
         </div>
       ) : (
-        <div className="empty"><h2>No games yet</h2><p>Start a game and invite a friend by username.</p></div>
+        <div className="empty"><h2>No {finished ? "finished" : "active"} games</h2><p>{finished ? "Finished games will appear here." : "Start a game and invite a friend by username."}</p></div>
       )}
     </section>
   );

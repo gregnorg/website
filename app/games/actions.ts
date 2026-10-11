@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { clearFinishedGameForPlayer } from "@/lib/game-repository";
 
-export async function clearFinishedGame(formData: FormData) {
+export async function markGameAsFinished(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
 
