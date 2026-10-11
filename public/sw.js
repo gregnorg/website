@@ -1,4 +1,4 @@
-const CACHE = "shove-actually-shell-v3";
+const CACHE = "shove-actually-shell-v4";
 const SHELL = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
