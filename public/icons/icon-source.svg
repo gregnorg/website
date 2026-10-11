@@ -13,7 +13,6 @@
     </filter>
   </defs>
 
-  <rect width="1024" height="1024" fill="#295b45"/>
   <rect x="76" y="246" width="872" height="532" rx="43" fill="#ab7b40" filter="url(#shadow)"/>
 
   <!-- Homepage board cells: 8 columns by 4 rows. -->
