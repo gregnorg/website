@@ -13,7 +13,7 @@ export type HistoryFrame = { label: string } & (
 
 // Fail closed: never skip missing or invalid moves as the live board renderer does.
 export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): HistoryFrame[] | null {
-  if (!moves.length || !["won", "draw", "cancelled"].includes(game.status)) return null;
+  if (!moves.length || !["active", "won", "draw", "cancelled"].includes(game.status)) return null;
   let ticBoard = [...EMPTY_BOARD] as TicBoard;
   let pushBoard = emptyBoard();
   const frames: HistoryFrame[] = [game.game_type === "tic_tac_toe"

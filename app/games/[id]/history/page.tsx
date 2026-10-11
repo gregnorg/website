@@ -32,7 +32,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ id: st
   if (!frames) notFound();
   const outcome = game.status === "won"
     ? `${game.winner_id === game.x_player_id ? game.white_name : game.black_name} won`
-    : game.status === "draw" ? "Draw" : "Cancelled";
+    : game.status === "draw" ? "Draw" : game.status === "active" ? "Current position · game in progress" : "Cancelled";
   return <section className="game-page">
     <p className="kicker"><Link href={`/games/${game.game_number}`}>← Back to game #{game.game_number}</Link></p>
     <h1>Game History</h1>
