@@ -358,33 +358,35 @@ export default function PushfightBoard({
           </div>
         )}
       </div>
-      {!spectator && <form action={action} className="pushfight-controls">
-        <input type="hidden" name="gameId" value={gameId} />
-        <input type="hidden" name="action_type" value={isSetupPhase ? "setup" : turnComplete ? "turn" : ""} />
-        <input type="hidden" name="action_payload" value={actionPayload ? JSON.stringify(actionPayload) : ""} />
-        <div className="form-actions">
-          <button className="button" type="submit" disabled={!canMove || !(isSetupPhase ? canSubmitSetup : turnComplete)}>
-            {isSetupPhase ? "Submit setup" : "Submit turn"}
-          </button>
-          <button className="button small" type="button" onClick={resetTurn} disabled={!canMove}>
-            Reset
+      <div className="pushfight-toolbar">
+        {!spectator && <form action={action} className="pushfight-controls">
+          <input type="hidden" name="gameId" value={gameId} />
+          <input type="hidden" name="action_type" value={isSetupPhase ? "setup" : turnComplete ? "turn" : ""} />
+          <input type="hidden" name="action_payload" value={actionPayload ? JSON.stringify(actionPayload) : ""} />
+          <div className="form-actions">
+            <button className="button" type="submit" disabled={!canMove || !(isSetupPhase ? canSubmitSetup : turnComplete)}>
+              {isSetupPhase ? "Submit setup" : "Submit turn"}
+            </button>
+            <button className="button small" type="button" onClick={resetTurn} disabled={!canMove}>
+              Reset
+            </button>
+          </div>
+        </form>}
+        <div className="pushfight-view-actions">
+          {replayBoards.length > 1 && (
+            <button className="button secondary replay-button" type="button" onClick={replayLastTurn} disabled={replaying || !replayEnabled}>
+              {replaying ? "Replaying…" : "View Last Turn"}
+            </button>
+          )}
+          <button
+            className="button small board-rotate-button"
+            type="button"
+            onClick={() => setRotation((current) => ((current + 1) % 4) as Rotation)}
+            aria-label="Rotate board 90 degrees clockwise"
+          >
+            <span aria-hidden="true">↻</span>
           </button>
         </div>
-      </form>}
-      <div className="pushfight-view-actions">
-        {replayBoards.length > 1 && (
-          <button className="button secondary replay-button" type="button" onClick={replayLastTurn} disabled={replaying || !replayEnabled}>
-            {replaying ? "Replaying…" : "View Last Turn"}
-          </button>
-        )}
-        <button
-          className="button small board-rotate-button"
-          type="button"
-          onClick={() => setRotation((current) => ((current + 1) % 4) as Rotation)}
-          aria-label="Rotate board 90 degrees clockwise"
-        >
-          <span aria-hidden="true">↻</span>
-        </button>
       </div>
     </div>
   );
