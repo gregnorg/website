@@ -259,16 +259,6 @@ export default function PushfightBoard({
     }
   };
 
-  const columnLabels = ["A", "B", "C", "D", "E", "F", "G", "H"];
-  const rowLabels = ["1", "2", "3", "4"];
-  const horizontalLabels = rotation === 0 ? columnLabels
-    : rotation === 1 ? rowLabels.toReversed()
-      : rotation === 2 ? columnLabels.toReversed()
-        : rowLabels;
-  const verticalLabels = rotation === 0 ? rowLabels
-    : rotation === 1 ? columnLabels
-      : rotation === 2 ? rowLabels.toReversed()
-        : columnLabels.toReversed();
   const visualRows = rotation % 2 === 0 ? 4 : 8;
   const visualColumns = rotation % 2 === 0 ? 8 : 4;
   const displayedOutcome = stagedOutcome ?? gameOutcome;
@@ -296,10 +286,6 @@ export default function PushfightBoard({
         style={{ gridTemplateColumns: `repeat(${visualColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${visualRows}, minmax(0, 1fr))` }}
         aria-label={`Pushfight board, rotated ${rotation * 90} degrees clockwise`}
       >
-        <div className="pf-axis-labels pf-column-labels top" style={{ gridTemplateColumns: `repeat(${visualColumns}, minmax(0, 1fr))` }}>{horizontalLabels.map((label) => <span key={label}>{label}</span>)}</div>
-        <div className="pf-axis-labels pf-column-labels bottom" style={{ gridTemplateColumns: `repeat(${visualColumns}, minmax(0, 1fr))` }}>{horizontalLabels.map((label) => <span key={label}>{label}</span>)}</div>
-        <div className="pf-axis-labels pf-row-labels left" style={{ gridTemplateRows: `repeat(${visualRows}, minmax(0, 1fr))` }}>{verticalLabels.map((label) => <span key={label}>{label}</span>)}</div>
-        <div className="pf-axis-labels pf-row-labels right" style={{ gridTemplateRows: `repeat(${visualRows}, minmax(0, 1fr))` }}>{verticalLabels.map((label) => <span key={label}>{label}</span>)}</div>
         {displayedBoard.map((row, rowIndex) => row.map((cell, colIndex) => {
           const coord = { row: rowIndex, col: colIndex };
           const valid = isValidCoord(coord);
