@@ -13,6 +13,14 @@ type Props = {
 export function GameMenu({ gameId, onRotate, resignAction, drawAction }: Props) {
   const details = useRef<HTMLDetailsElement>(null);
   const trigger = useRef<HTMLElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+
+  function fitPanel() {
+    if (!details.current?.open || !trigger.current || !panel.current) return;
+    const viewportTop = window.visualViewport?.offsetTop ?? 0;
+    const availableHeight = trigger.current.getBoundingClientRect().top - viewportTop - 14;
+    panel.current.style.maxHeight = `${Math.max(44, availableHeight)}px`;
+  }
 
   function close() {
     if (details.current) details.current.open = false;
@@ -31,20 +39,28 @@ export function GameMenu({ gameId, onRotate, resignAction, drawAction }: Props) 
     }
     document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", escape);
+    window.addEventListener("resize", fitPanel);
+    window.addEventListener("scroll", fitPanel, true);
+    window.visualViewport?.addEventListener("resize", fitPanel);
+    window.visualViewport?.addEventListener("scroll", fitPanel);
     return () => {
       document.removeEventListener("pointerdown", outside);
       document.removeEventListener("keydown", escape);
+      window.removeEventListener("resize", fitPanel);
+      window.removeEventListener("scroll", fitPanel, true);
+      window.visualViewport?.removeEventListener("resize", fitPanel);
+      window.visualViewport?.removeEventListener("scroll", fitPanel);
     };
   }, []);
 
   return (
-    <details className="game-menu" ref={details} onBlur={(event) => {
+    <details className="game-menu" ref={details} onToggle={fitPanel} onBlur={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget)) close();
     }}>
-      <summary className="button small game-menu-trigger" ref={trigger}>
-        <span aria-hidden="true">⋯</span> Menu
+      <summary className="button small game-menu-trigger" ref={trigger} aria-label="Game menu">
+        <span aria-hidden="true">⋯</span>
       </summary>
-      <div className="game-menu-panel">
+      <div className="game-menu-panel" ref={panel}>
         {onRotate && <button type="button" onClick={() => { onRotate(); close(); trigger.current?.focus(); }}>
           <span aria-hidden="true">↻</span> Rotate board
         </button>}
