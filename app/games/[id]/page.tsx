@@ -21,6 +21,7 @@ import {
 import RefreshOnReturn from "@/components/refresh-on-return";
 import { GameClocks } from "@/components/game-clocks";
 import GameChat from "@/components/game-chat";
+import { completeGameHistory, type HistoryMove } from "@/lib/game-history";
 
 export const dynamic = "force-dynamic";
 
@@ -81,8 +82,8 @@ export default async function GamePage({
   const isPlayer = viewerId === game.x_player_id || viewerId === game.o_player_id;
 
   const isTicTacToe = game.game_type === "tic_tac_toe";
-  const moves = await pool.query<GameMove>(
-    `SELECT m.position, m.payload, gp.mark, m.player_id
+  const moves = await pool.query<HistoryMove>(
+    `SELECT m.move_number, m.position, m.payload, gp.mark, m.player_id
        FROM moves m
        LEFT JOIN game_players gp
          ON gp.game_id = m.game_id AND gp.user_id = m.player_id
@@ -214,6 +215,13 @@ export default async function GamePage({
         : game.status === "draw" ? "Draw." : game.status === "cancelled" ? "Cancelled." : "Waiting for players.";
   }
 
+  const hasFullHistory = completeGameHistory({
+    ...game,
+    externalEnding: Boolean(game.resigned_by_id || game.idle_expired ||
+      (game.time_control_seconds !== null && ((game.my_time_remaining_ms !== null && Number(game.my_time_remaining_ms) === 0) ||
+        (game.opponent_time_remaining_ms !== null && Number(game.opponent_time_remaining_ms) === 0)))),
+  }, moves.rows) !== null;
+
   const moveAction = makeMove;
 
   return (
@@ -313,6 +321,7 @@ export default async function GamePage({
           </div>
         </>
       )}
+      {hasFullHistory && <Link className="button secondary history-link" href={`/games/${game.game_number}/history`}>View Game History</Link>}
       {session && <GameChat gameId={id} />}
     </section>
   );
