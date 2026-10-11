@@ -30,6 +30,9 @@ export function GameMenu({ gameId, onRotate, resignAction, drawAction }: Props) 
     function outside(event: PointerEvent) {
       if (event.target instanceof Node && !details.current?.contains(event.target)) close();
     }
+    function focusOutside(event: FocusEvent) {
+      if (event.target instanceof Node && !details.current?.contains(event.target)) close();
+    }
     function escape(event: KeyboardEvent) {
       if (event.key === "Escape" && details.current?.open) {
         event.preventDefault();
@@ -38,6 +41,7 @@ export function GameMenu({ gameId, onRotate, resignAction, drawAction }: Props) 
       }
     }
     document.addEventListener("pointerdown", outside);
+    document.addEventListener("focusin", focusOutside);
     document.addEventListener("keydown", escape);
     window.addEventListener("resize", fitPanel);
     window.addEventListener("scroll", fitPanel, true);
@@ -45,6 +49,7 @@ export function GameMenu({ gameId, onRotate, resignAction, drawAction }: Props) 
     window.visualViewport?.addEventListener("scroll", fitPanel);
     return () => {
       document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("focusin", focusOutside);
       document.removeEventListener("keydown", escape);
       window.removeEventListener("resize", fitPanel);
       window.removeEventListener("scroll", fitPanel, true);
@@ -54,9 +59,7 @@ export function GameMenu({ gameId, onRotate, resignAction, drawAction }: Props) 
   }, []);
 
   return (
-    <details className="game-menu" ref={details} onToggle={fitPanel} onBlur={(event) => {
-      if (!event.currentTarget.contains(event.relatedTarget)) close();
-    }}>
+    <details className="game-menu" ref={details} onToggle={fitPanel}>
       <summary className="button small game-menu-trigger" ref={trigger} aria-label="Game menu">
         <span aria-hidden="true">⋯</span>
       </summary>
