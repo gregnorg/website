@@ -53,11 +53,16 @@ const pushGame = { ...game, game_type: "pushfight" as const, externalEnding: tru
 test("Push Fight history includes both setups and each action in a submitted turn", () => {
   const frames = completeGameHistory(pushGame, [...setups, turn])!;
   assert.equal(frames.length, 5);
-  assert.equal(frames[0].board[1][0], "empty");
-  assert.equal(frames[1].board[1][0], "white-pusher");
-  assert.equal(frames[3].board[1][3], "white-pusher");
-  assert.equal(frames[4].board[1][1], "white-pusher-anchor");
-  assert.equal(frames[3].board[1][0], "white-pusher");
+  const boards = frames.map(frame => {
+    assert.equal(frame.type, "pushfight");
+    if (frame.type !== "pushfight") throw new Error("Expected a Push Fight frame");
+    return frame.board;
+  });
+  assert.equal(boards[0][1][0], "empty");
+  assert.equal(boards[1][1][0], "white-pusher");
+  assert.equal(boards[3][1][3], "white-pusher");
+  assert.equal(boards[4][1][1], "white-pusher-anchor");
+  assert.equal(boards[3][1][0], "white-pusher");
   assert.match(frames[4].label, /pushes right/);
 });
 
