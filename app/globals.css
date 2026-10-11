@@ -305,7 +305,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 
 @media(max-width:760px) {
   .pushfight-toolbar { display:grid; grid-template-columns:minmax(0, 1fr); gap:10px; }
-  .pushfight-controls .form-actions, .pushfight-view-actions { display:grid; grid-template-columns:minmax(0, 1fr) 84px; gap:10px; width:100%; margin:0; align-items:stretch; }
+  .pushfight-controls .form-actions, .pushfight-view-actions { display:grid; grid-template-columns:minmax(0, 160px) 84px; gap:10px; width:min(100%, 254px); margin:0; align-items:stretch; }
   .pushfight-toolbar .button { width:100%; min-width:0; }
   .pushfight-view-actions .board-rotate-button { grid-column:2; width:100%; }
 }
