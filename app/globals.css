@@ -211,7 +211,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
   .pf-knockout, .pf-result-overlay { animation-duration:.01ms; }
 }
 .pf-board .ready-description { color:#553d20; font-weight:700; }
-.pushfight-controls { display:grid; gap:16px; align-items:start; }
+.pushfight-controls { display:grid; gap:16px; align-items:start; margin:0; }
 .pushfight-action-row { display:grid; gap:16px; grid-template-columns:1fr auto; }
 .pushfight-controls label { display:grid; gap:8px; font-weight:700; font-size:14px; color:#3f372f; }
 .pushfight-controls select { width:100%; padding:10px 12px; border:1px solid #8b7d6b; border-radius:8px; background:#fff; font:inherit; }
