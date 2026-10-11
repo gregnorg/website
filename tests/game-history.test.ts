@@ -74,11 +74,11 @@ test("Push Fight rejects missing setup, null payloads and wrong players", () => 
 });
 
 
-test("active games offer complete history up to the current position", () => {
+test("active games never offer history replay", () => {
   const activeTic = { ...game, status: "active" as const, winner_id: null };
-  assert.equal(completeGameHistory(activeTic, moves.slice(0, 3))?.length, 4);
+  assert.equal(completeGameHistory(activeTic, moves.slice(0, 3)), null);
   assert.equal(completeGameHistory(activeTic, moves.filter(move => move.move_number !== 2).slice(0, 3)), null);
   const activePush = { ...pushGame, status: "active" as const, winner_id: null, externalEnding: false };
-  assert.equal(completeGameHistory(activePush, [...setups, turn])?.length, 5);
+  assert.equal(completeGameHistory(activePush, [...setups, turn]), null);
   assert.equal(completeGameHistory(activePush, [setups[1], turn]), null);
 });

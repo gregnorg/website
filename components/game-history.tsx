@@ -4,8 +4,8 @@ import { useState } from "react";
 import type { HistoryFrame } from "@/lib/game-history";
 import PushfightBoard from "@/components/pushfight-board";
 
-export default function GameHistory({ frames, gameId, whiteId, blackId, outcome }: {
-  frames: HistoryFrame[]; gameId: string; whiteId: string; blackId: string; outcome: string;
+export default function GameHistory({ frames, gameId, whiteId, blackId }: {
+  frames: HistoryFrame[]; gameId: string; whiteId: string; blackId: string;
 }) {
   const [step, setStep] = useState(0);
   const frame = frames[step];
@@ -17,7 +17,7 @@ export default function GameHistory({ frames, gameId, whiteId, blackId, outcome 
       <button className="button" onClick={() => setStep(step + 1)} disabled={step === last}>Next</button>
       <button className="button secondary" onClick={() => setStep(last)} disabled={step === last}>Last</button>
     </nav>
-    <p className="game-summary" aria-live="polite">Step {step} of {last} · {frame.label}{step === last ? ` · ${outcome}` : ""}</p>
+    <p className="game-summary" aria-live="polite">Step {step} of {last}</p>
     <label className="history-slider">Jump to step
       <input type="range" min={0} max={last} value={step} onChange={event => setStep(Number(event.target.value))} />
     </label>
