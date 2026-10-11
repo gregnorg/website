@@ -49,7 +49,7 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
           const result = applyMove(pushBoard, action, mark === "X" ? "white" : "black");
           pushBoard = result.board;
           boardWinner = result.winner === "white" ? game.x_player_id : result.winner === "black" ? game.o_player_id : null;
-          const label = action.type === "setup" ? `${team} Setup`
+          const label = action.type === "setup" ? `${team} ${team === "White" ? "setup" : "Setup"}`
             : action.type === "push" ? `Turn ${turnNumber} Push`
             : `Turn ${turnNumber} Move ${individualMoves}`;
           frames.push({ type: "pushfight", board: pushBoard, label });

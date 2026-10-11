@@ -63,7 +63,7 @@ test("Push Fight history includes both setups and each action in a submitted tur
   assert.equal(boards[3][1][3], "white-pusher");
   assert.equal(boards[4][1][1], "white-pusher-anchor");
   assert.equal(boards[3][1][0], "white-pusher");
-  assert.deepEqual(frames.map(frame => frame.label), ["Before setup", "White Setup", "Black Setup", "Turn 1 Move 1", "Turn 1 Push"]);
+  assert.deepEqual(frames.map(frame => frame.label), ["Before setup", "White setup", "Black Setup", "Turn 1 Move 1", "Turn 1 Push"]);
 });
 
 test("Push Fight rejects missing setup, null payloads and wrong players", () => {
@@ -103,4 +103,20 @@ test("turn labels number individual moves and restart after a push for bundled a
     ...blackTurn.payload.actions.map(payload => ({ ...blackTurn, payload }))]
     .map((move, index) => ({ ...move, move_number: index + 3 }));
   assert.deepEqual(completeGameHistory(pushGame, [...setups, ...legacy]), frames);
+});
+
+
+test("turns without moves show only Push and one-move turns skip Move 2", () => {
+  const whitePush: HistoryMove = { ...turn, payload: { type: "turn", actions: [
+    { type: "push", index: { row: 1, col: 0 }, dir: "right" },
+  ] } };
+  const blackPush: HistoryMove = { ...turn, move_number: 4, player_id: "black", mark: "O", payload: { type: "turn", actions: [
+    { type: "push", index: { row: 1, col: 7 }, dir: "left" },
+  ] } };
+  const pushOnly = completeGameHistory(pushGame, [...setups, whitePush, blackPush]);
+  assert.ok(pushOnly);
+  assert.deepEqual(pushOnly.slice(1).map(frame => frame.label), ["White setup", "Black Setup", "Turn 1 Push", "Turn 2 Push"]);
+  const oneMove = completeGameHistory(pushGame, [...setups, turn]);
+  assert.ok(oneMove);
+  assert.deepEqual(oneMove.slice(3).map(frame => frame.label), ["Turn 1 Move 1", "Turn 1 Push"]);
 });
