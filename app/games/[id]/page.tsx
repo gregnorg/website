@@ -230,6 +230,7 @@ export default async function GamePage({
         poll={game.status === "active"}
         automatic={!(isPlayer && game.status === "active" && game.time_control_seconds !== null)}
       />
+      <p className="kicker game-heading">Game #{game.game_number}{!isPlayer && " · Spectating"}</p>
       {isPlayer && moved === "1" && (
         <div className="after-move" role="status">
           <span>Move submitted.</span>
@@ -316,7 +317,6 @@ export default async function GamePage({
         </>
       )}
       {hasFullHistory && <Link className="button secondary history-link" href={`/games/${game.game_number}/history`}>View Game History</Link>}
-      <p className="game-chat-heading">Game #{game.game_number}{!isPlayer && " · Spectating"}</p>
       {session && <GameChat gameId={id} />}
     </section>
   );
