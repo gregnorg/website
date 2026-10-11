@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { GameMenu } from "@/components/game-menu";
 import type { Board, Coord, PushfightCell, MovePayload, TurnAction } from "@/lib/pushfight";
 import { applyMove, isValidCoord } from "@/lib/pushfight";
 
@@ -23,6 +24,8 @@ type Props = {
   gameOutcome: "win" | "loss" | null;
   replayBoards?: Board[];
   replayEnabled?: boolean;
+  resignAction?: (formData: FormData) => Promise<void>;
+  drawAction?: (formData: FormData) => Promise<void>;
 };
 
 type LegalTarget = { coord: Coord; action: TurnAction; board: Board; winner?: "white" | "black" };
@@ -129,6 +132,8 @@ export default function PushfightBoard({
   gameOutcome,
   replayBoards = [],
   replayEnabled = true,
+  resignAction,
+  drawAction,
 }: Props) {
   const [selectedPiece, setSelectedPiece] = useState<Coord | null>(null);
   const [setupSelection, setSetupSelection] = useState<Coord[]>([]);
@@ -364,14 +369,12 @@ export default function PushfightBoard({
               {replaying ? "Replaying…" : "View Last Turn"}
             </button>
           )}
-          <button
-            className="button small board-rotate-button"
-            type="button"
-            onClick={() => setRotation((current) => ((current + 1) % 4) as Rotation)}
-            aria-label="Rotate board 90 degrees clockwise"
-          >
-            <span aria-hidden="true">↻</span>
-          </button>
+          <GameMenu
+            gameId={gameId}
+            onRotate={() => setRotation((current) => ((current + 1) % 4) as Rotation)}
+            resignAction={resignAction}
+            drawAction={drawAction}
+          />
         </div>
       </div>
     </div>

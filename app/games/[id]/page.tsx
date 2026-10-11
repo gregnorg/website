@@ -8,7 +8,7 @@ import { makeMove, resignGame, manageDrawOffer } from "./actions";
 import PushfightBoard from "@/components/pushfight-board";
 import { applyMove, emptyBoard, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
 import { TicTacToeBoard } from "@/components/tic-tac-toe-board";
-import { ConfirmResignButton } from "@/components/confirm-resign-button";
+import { GameMenu } from "@/components/game-menu";
 import {
   currentPlayerId as getCurrentPlayerId,
   isSetupPhase,
@@ -286,6 +286,8 @@ export default async function GamePage({
             statusMessage={summary}
             errorMessage={error}
             gameOutcome={isPlayer && game.status === "won" ? (game.winner_id === viewerId ? "win" : "loss") : null}
+            resignAction={isPlayer && game.status === "active" ? resignGame : undefined}
+            drawAction={isPlayer && game.status === "active" && !game.draw_offer_id ? manageDrawOffer : undefined}
             replayBoards={pushfightReplayBoards}
             replayEnabled={replayEnabled}
           />
@@ -309,16 +311,9 @@ export default async function GamePage({
             </form>
             <p className="draw-offer-note">Play continues until the draw is accepted.</p>
           </div>}
-          <div className="game-end-actions">
-            <form action={resignGame}>
-              <input type="hidden" name="gameId" value={id} />
-              <ConfirmResignButton />
-            </form>
-            {!game.draw_offer_id && <form action={manageDrawOffer}>
-              <input type="hidden" name="gameId" value={id} />
-              <button className="draw-offer-button" name="response" value="offer">Offer draw</button>
-            </form>}
-          </div>
+          {game.game_type === "tic_tac_toe" && <div className="game-end-actions">
+            <GameMenu gameId={id} resignAction={resignGame} drawAction={!game.draw_offer_id ? manageDrawOffer : undefined} />
+          </div>}
         </>
       )}
       {hasFullHistory && <Link className="button secondary history-link" href={`/games/${game.game_number}/history`}>View Game History</Link>}
