@@ -109,7 +109,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .status { padding:4px 9px; border-radius:999px; color:var(--accent); background:#e5eee9; font-size:12px; font-weight:700; text-transform:capitalize; }
 .game-page { width:min(520px, calc(100% - 40px)); margin:auto; padding:42px 0 64px; text-align:center; }
 .game-page h1 { margin-bottom:8px; font-size:38px; }
-.game-heading { margin:0 12px 16px; line-height:1.6; }
+.game-chat-heading { margin:20px 12px 8px; color:var(--muted); font-size:13px; line-height:1.6; text-align:left; }
 .after-move { margin:0 0 28px; padding:12px 14px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 16px; border:1px solid #b9d3c5; border-radius:4px; color:var(--accent); background:#e5eee9; font-weight:700; text-align:left; }
 .game-summary { margin-bottom:24px; color:var(--muted); font-size:18px; }
 .game-clocks { margin:20px 0 28px; display:grid; grid-template-columns:1fr 1fr; gap:10px; text-align:left; }
