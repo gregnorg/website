@@ -6,7 +6,6 @@ import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type GameType } from "@/lib/game-state";
 import { transferChampionship } from "@/lib/championship";
-import { sendGameEndedEmail } from "@/lib/turn-email";
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -109,6 +108,5 @@ export async function POST(request: Request) {
     client.release();
   }
 
-  if (timedOut) await sendGameEndedEmail(gameId, `clock-${session.user.id}`);
   return NextResponse.json({ remainingMs, timedOut });
 }

@@ -12,7 +12,7 @@ import { Board, EMPTY_BOARD, isDraw, play, winner } from "@/lib/game";
 import { applyMove, emptyBoard as pfInitialBoard, MovePayload, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
 import { getMoveGameForPlayer, resignGameForPlayer, offerDrawForPlayer, respondToDrawForPlayer } from "@/lib/game-repository";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type PlayerMark } from "@/lib/game-state";
-import { sendGameEndedEmail, sendTurnNotification } from "@/lib/turn-email";
+import { sendTurnNotification } from "@/lib/turn-email";
 import { transferChampionship } from "@/lib/championship";
 
 export async function resignGame(formData: FormData) {
@@ -23,10 +23,9 @@ export async function resignGame(formData: FormData) {
   if (!gameId) redirect("/games");
 
   const client = await pool.connect();
-  let resigned = false;
   try {
     await client.query("BEGIN");
-    resigned = await resignGameForPlayer(client, gameId, session.user.id);
+    await resignGameForPlayer(client, gameId, session.user.id);
     await client.query("COMMIT");
     after(sendCrownAnnouncements);
   } catch (error) {
@@ -35,8 +34,6 @@ export async function resignGame(formData: FormData) {
   } finally {
     client.release();
   }
-
-  if (resigned) await sendGameEndedEmail(gameId, "resignation");
 
   revalidatePath(`/games/${gameId}`);
   revalidatePath("/games");
@@ -135,9 +132,7 @@ export async function makeMove(formData: FormData) {
         }
         await client.query("COMMIT");
         after(sendCrownAnnouncements);
-        if (winningMark) {
-          await sendGameEndedEmail(gameId, `move-${moves.rows.length + 1}`);
-        } else if (!isDraw(nextBoard)) {
+        if (!winningMark && !isDraw(nextBoard)) {
           const nextPlayerId = players.rows.find((row) => row.user_id !== session.user.id)?.user_id;
           if (nextPlayerId) await sendTurnNotification(gameId, nextPlayerId);
         }
@@ -244,9 +239,7 @@ export async function makeMove(formData: FormData) {
         }
         await client.query("COMMIT");
         after(sendCrownAnnouncements);
-        if (result.winner) {
-          await sendGameEndedEmail(gameId, `move-${moves.rows.length + 1}`);
-        } else {
+        if (!result.winner) {
           const nextSummary = summarizeTurns([
             ...moves.rows,
             { player_id: session.user.id, payload: actionPayload },
