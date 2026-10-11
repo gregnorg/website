@@ -230,7 +230,7 @@ export default async function GamePage({
         poll={game.status === "active"}
         automatic={!(isPlayer && game.status === "active" && game.time_control_seconds !== null)}
       />
-      <p className="kicker game-heading"><Link href="/games/all">All Games</Link> · <Link href={`/games/${game.game_number}`}>Game #{game.game_number}</Link>{!isPlayer && " · Spectating"}</p>
+      <p className="kicker game-heading">Game #{game.game_number}{!isPlayer && " · Spectating"}</p>
       {isPlayer && moved === "1" && (
         <div className="after-move" role="status">
           <span>Move submitted.</span>

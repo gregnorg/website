@@ -109,12 +109,12 @@ export function GameClocks({ gameId, myName, opponentName, myIsChampion, opponen
     <div className="game-clocks" aria-label="Game clocks">
       <div className={`clock-${myColor}${myTurn ? " active" : ""}`}>
         <span>{myIsChampion && <ChampionCrown />}{myName}</span>
-        <strong>{timed ? formatClock(canMove ? remainingMs : myRemainingMs) : "∞"}</strong>
+        <strong>{timed ? formatClock(canMove ? remainingMs : myRemainingMs) : ""}</strong>
         {timed && canMove && graceMs > 0 && <small>Starts in {Math.ceil(graceMs / 1000)}s</small>}
       </div>
       <div className={`clock-${myColor === "white" ? "black" : "white"}${opponentCanMove ? " active" : ""}`}>
         <span>{opponentIsChampion && <ChampionCrown />}{opponentName}</span>
-        <strong>{timed ? formatClock(opponentRemainingMs) : "∞"}</strong>
+        <strong>{timed ? formatClock(opponentRemainingMs) : ""}</strong>
       </div>
     </div>
   );
