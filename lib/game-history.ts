@@ -21,6 +21,7 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
     : { type: "pushfight", board: pushBoard, label: "Before setup" }];
   let boardWinner: string | null = null;
   let individualMoves = 0;
+  let turnNumber = 1;
   const processed: GameMove[] = [];
   try {
     for (const [index, move] of moves.entries()) {
@@ -35,22 +36,27 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
         ticBoard = play(ticBoard, move.position, mark);
         const winningMark = winner(ticBoard);
         boardWinner = winningMark === "X" ? game.x_player_id : winningMark === "O" ? game.o_player_id : null;
-        frames.push({ type: "tic_tac_toe", board: ticBoard, label: `Move ${index + 1}: ${mark} plays square ${move.position + 1}` });
+        frames.push({ type: "tic_tac_toe", board: ticBoard, label: `Turn ${index + 1} Move 1` });
       } else {
         const payload = normalizeMovePayload(move.payload);
         const setupCount = summarizeTurns(processed).setupMoveCount;
         if ((setupCount < 2) !== (payload.type === "setup")) return null;
         if (payload.type === "turn" && individualMoves !== 0) return null;
         const actions = payload.type === "turn" ? payload.actions : [payload];
-        for (const [actionIndex, action] of actions.entries()) {
+        for (const action of actions) {
           if (boardWinner) return null;
           if (action.type === "move" && ++individualMoves > 2) return null;
           const result = applyMove(pushBoard, action, mark === "X" ? "white" : "black");
           pushBoard = result.board;
           boardWinner = result.winner === "white" ? game.x_player_id : result.winner === "black" ? game.o_player_id : null;
-          if (action.type === "push") individualMoves = 0;
-          const description = action.type === "setup" ? "sets up" : action.type === "push" ? `pushes ${action.dir}` : "moves a piece";
-          frames.push({ type: "pushfight", board: pushBoard, label: `Move ${index + 1}${actions.length > 1 ? `, step ${actionIndex + 1}` : ""}: ${team} ${description}` });
+          const label = action.type === "setup" ? `${team} Setup`
+            : action.type === "push" ? `Turn ${turnNumber} Push`
+            : `Turn ${turnNumber} Move ${individualMoves}`;
+          frames.push({ type: "pushfight", board: pushBoard, label });
+          if (action.type === "push") {
+            individualMoves = 0;
+            turnNumber += 1;
+          }
         }
       }
       processed.push(move);

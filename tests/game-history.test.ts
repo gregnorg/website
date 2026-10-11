@@ -63,7 +63,7 @@ test("Push Fight history includes both setups and each action in a submitted tur
   assert.equal(boards[3][1][3], "white-pusher");
   assert.equal(boards[4][1][1], "white-pusher-anchor");
   assert.equal(boards[3][1][0], "white-pusher");
-  assert.match(frames[4].label, /pushes right/);
+  assert.deepEqual(frames.map(frame => frame.label), ["Before setup", "White Setup", "Black Setup", "Turn 1 Move 1", "Turn 1 Push"]);
 });
 
 test("Push Fight rejects missing setup, null payloads and wrong players", () => {
@@ -81,4 +81,26 @@ test("active games never offer history replay", () => {
   const activePush = { ...pushGame, status: "active" as const, winner_id: null, externalEnding: false };
   assert.equal(completeGameHistory(activePush, [...setups, turn]), null);
   assert.equal(completeGameHistory(activePush, [setups[1], turn]), null);
+});
+
+
+test("turn labels number individual moves and restart after a push for bundled and legacy turns", () => {
+  if (turn.payload?.type !== "turn") throw new Error("Expected a turn");
+  const twoMoves: HistoryMove = { ...turn, payload: { type: "turn", actions: [
+    turn.payload.actions[0],
+    { type: "move", from: { row: 0, col: 2 }, to: { row: 0, col: 3 } },
+    turn.payload.actions[1],
+  ] } };
+  const blackTurn: HistoryMove = { move_number: 4, position: null, player_id: "black", mark: "O", payload: { type: "turn", actions: [
+    { type: "move", from: { row: 0, col: 5 }, to: { row: 0, col: 6 } },
+    { type: "push", index: { row: 0, col: 4 }, dir: "left" },
+  ] } };
+  const frames = completeGameHistory(pushGame, [...setups, twoMoves, blackTurn])!;
+  assert.ok(frames);
+  assert.deepEqual(frames.slice(3).map(frame => frame.label), ["Turn 1 Move 1", "Turn 1 Move 2", "Turn 1 Push", "Turn 2 Move 1", "Turn 2 Push"]);
+  if (twoMoves.payload?.type !== "turn" || blackTurn.payload?.type !== "turn") throw new Error("Expected turns");
+  const legacy = [...twoMoves.payload.actions.map(payload => ({ ...twoMoves, payload })),
+    ...blackTurn.payload.actions.map(payload => ({ ...blackTurn, payload }))]
+    .map((move, index) => ({ ...move, move_number: index + 3 }));
+  assert.deepEqual(completeGameHistory(pushGame, [...setups, ...legacy]), frames);
 });
