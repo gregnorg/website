@@ -285,8 +285,8 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .game-chat-form .button { flex:none; margin:0; padding:4px 9px; min-height:30px; font-size:12px; }
 .game-chat .error { margin:6px 0 0; font-size:12px; }
 
-.history-controls { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:20px 0; }
-.history-slider { display:flex; align-items:center; justify-content:center; gap:12px; margin:16px 0; }
+.history-controls { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:16px 0 10px; }
+.history-slider { display:flex; align-items:center; justify-content:center; gap:12px; margin:0 0 12px; }
 .history-slider input { max-width:320px; width:60%; }
 .history-link { margin-top:24px; }
 
@@ -298,7 +298,9 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
   .pushfight-view-actions .game-menu-trigger { padding:10px 8px; }
 }
 
-.replay-evaluation-slot { height:3.5rem; display:grid; align-items:center; padding:0 12px; }
+.history-status { margin:8px 0 12px; }
+.history-status .game-summary { margin:0; line-height:1.4; }
+.replay-evaluation-slot { height:3rem; display:grid; align-items:start; padding:2px 12px 0; }
 .replay-evaluation { margin:0; text-align:center; font-weight:600; line-height:1.4; }
 .replay-analysis-credit { margin-top:32px; color:var(--muted); font-size:12px; text-align:center; }
 .replay-analysis-credit p { margin:4px 0; }
