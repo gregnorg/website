@@ -98,6 +98,15 @@ test("whole-turn frames match for bundled and legacy turns", () => {
   const frames = completeGameHistory(pushGame, [...setups, twoMoves, blackTurn])!;
   assert.ok(frames);
   assert.deepEqual(frames.slice(3).map(frame => frame.label), ["Turn 1", "Turn 2"]);
+  const whiteFrame = frames[3];
+  if (whiteFrame.type !== "pushfight") throw new Error("Expected Push Fight");
+  assert.deepEqual(whiteFrame.actions?.map(action => action.label), [
+    "Turn 1 Move 1", "Turn 1 Move 2", "Turn 1 Push",
+  ]);
+  assert.equal(whiteFrame.actions?.[0].board[0][2], "white-pusher");
+  assert.equal(whiteFrame.actions?.[1].board[0][2], "empty");
+  assert.equal(whiteFrame.actions?.[1].board[1][0], "white-pusher");
+  assert.deepEqual(whiteFrame.actions?.[2].board, whiteFrame.board);
   if (twoMoves.payload?.type !== "turn" || blackTurn.payload?.type !== "turn") throw new Error("Expected turns");
   const legacy = [...twoMoves.payload.actions.map(payload => ({ ...twoMoves, payload })),
     ...blackTurn.payload.actions.map(payload => ({ ...blackTurn, payload }))]

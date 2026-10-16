@@ -8,7 +8,7 @@ export type HistoryGame = {
   x_player_id: string; o_player_id: string; externalEnding: boolean;
 };
 export type HistoryFrame = { label: string } & (
-  { type: "tic_tac_toe"; board: TicBoard } | { type: "pushfight"; board: PushBoard }
+  { type: "tic_tac_toe"; board: TicBoard } | { type: "pushfight"; board: PushBoard; actions?: { board: PushBoard; label: string }[] }
 );
 
 // Fail closed: never skip missing or invalid moves as the live board renderer does.
@@ -22,6 +22,7 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
   let boardWinner: string | null = null;
   let individualMoves = 0;
   let turnNumber = 1;
+  let turnActions: { board: PushBoard; label: string }[] = [];
   const processed: GameMove[] = [];
   try {
     for (const [index, move] of moves.entries()) {
@@ -49,11 +50,17 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
           const result = applyMove(pushBoard, action, mark === "X" ? "white" : "black");
           pushBoard = result.board;
           boardWinner = result.winner === "white" ? game.x_player_id : result.winner === "black" ? game.o_player_id : null;
+          if (action.type !== "setup") {
+            turnActions.push({ board: pushBoard, label: action.type === "push"
+              ? `Turn ${turnNumber} Push` : `Turn ${turnNumber} Move ${individualMoves}` });
+          }
           if (action.type === "setup" || action.type === "push") {
             const label = action.type === "setup" ? `${team} setup` : `Turn ${turnNumber}`;
-            frames.push({ type: "pushfight", board: pushBoard, label });
+            frames.push({ type: "pushfight", board: pushBoard, label,
+              ...(action.type === "push" ? { actions: turnActions } : {}) });
           }
           if (action.type === "push") {
+            turnActions = [];
             individualMoves = 0;
             turnNumber += 1;
           }
@@ -63,7 +70,7 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
     }
     // External endings can leave the final turn unfinished.
     if (game.game_type === "pushfight" && individualMoves > 0) {
-      frames.push({ type: "pushfight", board: pushBoard, label: `Turn ${turnNumber} (incomplete)` });
+      frames.push({ type: "pushfight", board: pushBoard, label: `Turn ${turnNumber} (incomplete)`, actions: turnActions });
     }
     if (boardWinner && (game.status !== "won" || boardWinner !== game.winner_id)) return null;
     if (game.status === "won" && (!game.winner_id || (!boardWinner && !game.externalEnding))) return null;
