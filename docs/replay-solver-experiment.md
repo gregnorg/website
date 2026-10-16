@@ -9,7 +9,7 @@ the old application. Also disable `shoveactually-analysis-monitor.timer`. Keep t
 
 Migration `019_add_replay_analysis_cache.sql` adds a transactional completion
 trigger, a resumable job queue, a permanent position cache, and a shared provider
-cooldown. Migration 020 adds the outage monitor state. Apply both with `npm run migrate` before deploying this version.
+cooldown. Migration 020 adds outage monitor state, and 021 adds the durable one-week stop. Apply all three with `npm run migrate` before deploying this version.
 Every Push Fight win, resignation, timeout, agreed draw, or cancellation queues
 one game. The trigger covers every ending path without putting network requests
 inside gameplay transactions. Existing finished games are backfilled gradually.
@@ -45,7 +45,9 @@ positions display the winner reconstructed by our game rules.
 
 1. **Saved results plus automatic retry (default).** On failure, a persistent,
    shared cooldown starts at five minutes, triples on consecutive failures, and
-   caps at one attempt per day. Successful lookups reset it. New games and
+   caps at one attempt per day. After a week of continuous outage, all automatic
+   requests stop until an administrator explicitly resumes them. Successful
+   lookups before the cutoff reset the outage and retry delay. New games and
    replay visits cannot bypass the cooldown. Saved values are never deleted or
    replaced by a failure. Uncached positions receive no invented prediction.
 2. **Independent backup server.** Set `PUSHFIGHT_SOLVER_FALLBACK_URL` to another
@@ -71,35 +73,57 @@ are visible in `journalctl -u shoveactually-analysis.service`; pending game and
 provider details are in `pushfight_analysis_jobs` and
 `pushfight_analysis_provider_state`.
 
-## Admin outage alerts
+## Admin outage alerts and the one-week stop
 
-`shoveactually-analysis-monitor.timer` checks the configured primary lookup API
-with a known valid position every 15 minutes, even if no game needs analysis.
-It bypasses the permanent cache and excludes fallback endpoints, so a working
-backup cannot hide a primary outage. These low-frequency health probes are the
-only regular upstream requests unrelated to newly finished games.
+`shoveactually-analysis-monitor.timer` wakes every minute to inspect local state.
+When healthy, it probes the configured primary with a known valid position every
+15 minutes, even if no game needs analysis. During outages, both the monitor and
+analysis worker share the increasing retry delay: five minutes, 15 minutes,
+45 minutes, and so on, capped at one day. A common session lock prevents duplicate
+attempts from the two processes. Worker observations update the same outage
+clock, and successful primary lookups reset it. Cached reads never reset it.
 
-After more than 24 hours of consecutive failed checks, the monitor emails all
-current, non-banned site admins, using the existing `RESEND_API_KEY` and
-`RESEND_FROM_EMAIL` settings. It sends one alert per outage, with no repeated
-reminders. A successful check clears the incident and enables alerts for a
-future outage. Changing the configured primary starts a fresh monitoring period.
+After more than 24 hours of consecutive failures, the monitor emails all current,
+non-banned site admins using the existing `RESEND_API_KEY` and
+`RESEND_FROM_EMAIL`. This warning is sent once per outage.
 
-Incident and sent-alert timestamps survive worker/application restarts. Failed
-email delivery is retried at the next monitor check with the same idempotency
-key. No email is sent merely because a single position cannot be analyzed or
-because the background worker is in its retry cooldown.
+At seven days from the first failure, the worker or monitor persists a stop
+**before making another request**. Both automatic analysis requests and health
+probes stop. The monitor sends a separate, one-time admin email saying requests
+have stopped. Failed delivery retries with the same idempotency key, without
+resuming solver queries. No extra 24-hour warning is sent if monitoring first
+catches up after the week-long cutoff.
 
-For a manual probe without state changes or email:
+Saved results keep working. Unfinished jobs and newly finished games stay queued;
+uncached turns display “Analysis unavailable; automatic retries stopped” and
+stop polling. App restarts, deployments, new games, and endpoint changes do not
+clear the stop. Check the service manually, then explicitly resume with:
+
+```sh
+npm run games:analysis:resume
+```
+
+This resets the outage, warning/stop email acknowledgments, and retry cooldown
+atomically, keeping cached values and pending jobs. The next worker/monitor tick
+can try again. Revisit or refresh a paused replay turn to load its new state.
+
+The default configuration uses only the public server and automatic retries;
+backup hosting and self-hosting remain optional capabilities, not active options.
+Before a stop, the monitor checks the primary directly instead of the cache or
+fallback so a backup cannot hide a primary outage. Once stopped, no configured
+endpoint is queried automatically.
+
+For a manual state check without changing state or sending email:
 
 ```sh
 node --env-file=.env.local scripts/check-replay-analysis.ts --dry-run
 ```
 
+A dry run honors cooldowns and the stopped state; it does not override them.
 Inspect `journalctl -u shoveactually-analysis-monitor.service` for monitoring or
-email delivery failures, and `pushfight_analysis_monitor_state` for the current
-incident. The actual alert is sent at the first scheduled check after the
-24-hour threshold, so detection has approximately 15-minute scheduling resolution.
+email delivery failures, and `pushfight_analysis_monitor_state` for the outage,
+next check, and stop timestamps. Threshold decisions run at roughly one-minute
+resolution, independently of whether a new upstream request is due.
 
 ## Solver conventions and attribution
 

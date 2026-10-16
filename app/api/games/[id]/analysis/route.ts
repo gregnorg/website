@@ -18,6 +18,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const result = await cachedReplayAnalysis(pool, history!.game.id, frame);
   return NextResponse.json(result, {
     status: result.pending ? 202 : 200,
-    headers: { "Cache-Control": result.pending ? "no-store" : "private, max-age=86400" },
+    headers: { "Cache-Control": (result.pending || result.stopped) ? "no-store" : "private, max-age=86400" },
   });
 }

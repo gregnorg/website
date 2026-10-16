@@ -8,6 +8,9 @@ import { createGameRecord, resignGameForPlayer, offerDrawForPlayer, respondToDra
 import { loadGameHistory } from "../lib/game-history-repository.ts";
 import { processReplayAnalysis, analysisRetryDelayMs } from "../lib/replay-analysis-worker.ts";
 import { cachedReplayAnalysis } from "../lib/replay-analysis-cache.ts";
+import { solverEndpoints } from "../lib/pushfight-analysis-service.ts";
+import { resumeReplayAnalysis } from "../lib/replay-analysis-resume.ts";
+import { SOLVER_OUTAGE_STOP_MS } from "../lib/replay-analysis-policy.ts";
 import { solverPosition } from "../lib/pushfight-analysis.ts";
 
 const payloads = [
@@ -45,6 +48,9 @@ test("finished games queue transactionally; background results survive outages a
     // Exercise the production migration without leaving schema or data changes.
     await client.query(await readFile(new URL("../database/migrations/019_add_replay_analysis_cache.sql", import.meta.url), "utf8"));
   }
+  await client.query(await readFile(new URL("../database/migrations/020_add_replay_analysis_monitor.sql", import.meta.url), "utf8"));
+  await client.query(await readFile(new URL("../database/migrations/021_stop_prolonged_solver_retries.sql", import.meta.url), "utf8"));
+  await client.query("UPDATE pushfight_analysis_monitor_state SET endpoint=NULL, incident_started_at=NULL, check_failures=0, stopped_at=NULL, stop_alert_at=NULL WHERE id=1");
   await client.query("DELETE FROM pushfight_analysis_jobs");
   await client.query("UPDATE pushfight_analysis_provider_state SET failures = 0, next_attempt_at = now(), last_error = NULL WHERE id = 1");
   const white = `analysis-white-${randomUUID()}`;
@@ -82,7 +88,7 @@ test("finished games queue transactionally; background results survive outages a
   assert.deepEqual(await cachedReplayAnalysis(client, game, frame1), { label: "Analysis pending", pending: true });
 
   let requests = 0;
-  const lookup = async () => { requests++; return { status: "W2", source: "http://solver.test" }; };
+  const lookup = async () => { requests++; return { status: "W2", source: solverEndpoints()[0] }; };
   const partial = await processReplayAnalysis(client, { lookup, maxLookups: 1, minDelayMs: 0 });
   assert.equal(partial.lookups, 1);
   assert.equal(partial.completed, 0);
@@ -133,6 +139,28 @@ test("finished games queue transactionally; background results survive outages a
     const result = await processReplayAnalysis(client, { lookup: async () => { throw new Error("Invalid history must not query the solver"); } });
     assert.equal(result.invalid, 1);
     assert.equal(result.lookups, 0);
+  });
+
+  await t.test("the worker latches the one-week stop before a request; saved results survive and manual resume keeps jobs", async () => {
+    const pending = await makeGame();
+    await resignGameForPlayer(client, pending, black);
+    await client.query("DELETE FROM pushfight_position_analysis WHERE permutation=$1", [pos2.permutation]);
+    await client.query("UPDATE pushfight_analysis_monitor_state SET incident_started_at=$1, stopped_at=NULL WHERE id=1",
+      [new Date(Date.now() - SOLVER_OUTAGE_STOP_MS - 1000)]);
+    let called = false;
+    const stopped = await processReplayAnalysis(client, { lookup: async () => { called = true; throw new Error("No requests after a week"); } });
+    assert.equal(stopped.stopped, true);
+    assert.equal(called, false);
+    assert.deepEqual(await cachedReplayAnalysis(client, pending, frame1), { label: "Black wins in 2 turns", pending: false });
+    assert.deepEqual(await cachedReplayAnalysis(client, pending, frame2), { label: "Analysis unavailable; automatic retries stopped", pending: false, stopped: true });
+    const again = await processReplayAnalysis(client, { lookup: async () => { called = true; return null; } });
+    assert.equal(again.stopped, true);
+    assert.equal(called, false);
+    await resumeReplayAnalysis(client);
+    const resumed = await processReplayAnalysis(client, { lookup, minDelayMs: 0 });
+    assert.equal(resumed.lookups, 1);
+    assert.equal(resumed.completed, 1);
+    assert.deepEqual(await cachedReplayAnalysis(client, pending, frame2), { label: "White wins in 2 turns", pending: false });
   });
 
   await t.test("overlapping workers cannot obtain the session lock", async () => {

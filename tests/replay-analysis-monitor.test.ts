@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { pool } from "../lib/db.ts";
-import { checkReplaySolverHealth, SOLVER_OUTAGE_ALERT_MS } from "../lib/replay-analysis-monitor.ts";
+import { checkReplaySolverHealth, SOLVER_OUTAGE_ALERT_MS, SOLVER_OUTAGE_STOP_MS } from "../lib/replay-analysis-monitor.ts";
 import type { MonitoringEmail } from "../lib/push-monitor.ts";
 
 test("solver outage alerts persist across checks and send only after more than 24 hours", async t => {
@@ -11,7 +11,11 @@ test("solver outage alerts persist across checks and send only after more than 2
   const client = await pool.connect();
   await client.query("BEGIN");
   t.after(async () => { await client.query("ROLLBACK"); client.release(); await pool.end(); });
+  if (!(await client.query("SELECT to_regclass('pushfight_position_analysis') AS name")).rows[0].name) {
+    await client.query(await readFile(new URL("../database/migrations/019_add_replay_analysis_cache.sql", import.meta.url), "utf8"));
+  }
   await client.query(await readFile(new URL("../database/migrations/020_add_replay_analysis_monitor.sql", import.meta.url), "utf8"));
+  await client.query(await readFile(new URL("../database/migrations/021_stop_prolonged_solver_retries.sql", import.meta.url), "utf8"));
   const admin = `solver-admin-${randomUUID()}`;
   const bannedAdmin = `solver-banned-${randomUUID()}`;
   for (const id of [admin, bannedAdmin]) {
@@ -24,12 +28,15 @@ test("solver outage alerts persist across checks and send only after more than 2
   const day = SOLVER_OUTAGE_ALERT_MS;
   const reset = async () => {
     emails.length = 0;
-    await client.query("UPDATE pushfight_analysis_monitor_state SET endpoint=NULL, incident_started_at=NULL, last_alert_at=NULL, last_checked_at=NULL, last_error=NULL WHERE id=1");
+    await client.query("UPDATE pushfight_analysis_monitor_state SET endpoint=NULL, incident_started_at=NULL, last_alert_at=NULL, last_checked_at=NULL, last_error=NULL, check_failures=0, next_check_at=now(), stopped_at=NULL, stop_alert_at=NULL WHERE id=1");
   };
   const sendEmail = async (email: MonitoringEmail) => { emails.push(email); };
-  const check = (offset: number, healthy = false) => checkReplaySolverHealth({
-    client, endpoint: "https://primary.example.test/lookup", now: at(offset), probe: async () => healthy, sendEmail,
-  });
+  const check = async (offset: number, healthy = false) => {
+    // Force a due probe for the threshold/recovery scenarios. Separate tests
+    // below exercise automatic increasing delays without this override.
+    await client.query("UPDATE pushfight_analysis_monitor_state SET next_check_at=$1 WHERE id=1", [at(offset)]);
+    return checkReplaySolverHealth({ client, endpoint: "https://primary.example.test/lookup", now: at(offset), probe: async () => healthy, sendEmail });
+  };
   await reset();
   await check(0);
   await check(day - 1);
@@ -104,4 +111,47 @@ test("solver outage alerts persist across checks and send only after more than 2
     assert.deepEqual(urls, ["https://primary.example.test/lookup/perms/..Y.OO........x.xoO.oXX..."]);
     assert.equal(emails.length, 0);
   });
+
+  await t.test("outage probes respect increasing delays instead of checking every timer tick", async () => {
+    await reset();
+    let probes = 0;
+    const run = (minutes: number) => checkReplaySolverHealth({ client, endpoint: "https://primary.example.test/lookup",
+      now: at(minutes * 60_000), probe: async () => { probes++; return false; }, sendEmail });
+    await run(0); await run(1); await run(4);
+    assert.equal(probes, 1);
+    await run(5); await run(6); await run(19);
+    assert.equal(probes, 2);
+    await run(20); await run(21);
+    assert.equal(probes, 3);
+    const next = (await client.query("SELECT next_check_at FROM pushfight_analysis_monitor_state WHERE id=1")).rows[0].next_check_at;
+    assert.equal(next.toISOString(), at(65 * 60_000).toISOString());
+  });
+
+  await t.test("a week stops all probes, sends one stop notice, and persists even if email delivery fails", async () => {
+    await reset();
+    await check(0);
+    const week = SOLVER_OUTAGE_STOP_MS;
+    let probes = 0;
+    let failedKey = "";
+    const stopped = (offset: number, fail = false) => checkReplaySolverHealth({ client, endpoint: "https://primary.example.test/lookup", now: at(offset),
+      probe: async () => { probes++; return true; },
+      sendEmail: async email => { if (fail) { failedKey = email.idempotencyKey; throw new Error("email unavailable"); } emails.push(email); },
+    });
+    await assert.rejects(stopped(week, true), /email unavailable/);
+    assert.equal(probes, 0, "no last-chance request is made after the cutoff");
+    const state = (await client.query("SELECT stopped_at,stop_alert_at FROM pushfight_analysis_monitor_state WHERE id=1")).rows[0];
+    assert.equal(state.stopped_at.toISOString(), at(week).toISOString());
+    assert.equal(state.stop_alert_at, null);
+    await stopped(week + 60_000);
+    assert.equal(emails.length, 1);
+    assert.match(emails[0].subject, /requests stopped/);
+    assert.match(emails[0].text, /npm run games:analysis:resume/);
+    assert.equal(emails[0].idempotencyKey, failedKey);
+    await stopped(week + day);
+    await checkReplaySolverHealth({ client, endpoint: "https://different.example.test/lookup", now: at(week + 2 * day),
+      probe: async () => { probes++; return true; }, sendEmail });
+    assert.equal(emails.length, 1);
+    assert.equal(probes, 0, "new invocations and endpoint changes cannot restart a stopped service");
+  });
+
 });

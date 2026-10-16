@@ -20,6 +20,7 @@ export default function ReplayEvaluation({ gameId, step }: { gameId: string; ste
         const data = await response.json();
         if (typeof data.label !== "string") throw new Error("Invalid lookup");
         if (controller.signal.aborted) return;
+        if (data.stopped === true) { setLabel(data.label); return; }
         if (data.pending === true) {
           setLabel(data.label);
           retry = setTimeout(() => { void analyze(); }, 30_000);

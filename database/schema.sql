@@ -140,3 +140,9 @@ CREATE TABLE IF NOT EXISTS pushfight_analysis_monitor_state (
   last_error TEXT
 );
 INSERT INTO pushfight_analysis_monitor_state(id) VALUES (1) ON CONFLICT DO NOTHING;
+
+ALTER TABLE pushfight_analysis_monitor_state
+  ADD COLUMN IF NOT EXISTS check_failures INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS next_check_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS stopped_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS stop_alert_at TIMESTAMPTZ;

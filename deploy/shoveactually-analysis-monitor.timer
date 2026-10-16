@@ -1,9 +1,9 @@
 [Unit]
-Description=Check the primary Push Fight solver every fifteen minutes
+Description=Check the primary Push Fight solver retry delays and the one-week stop
 
 [Timer]
 OnBootSec=2min
-OnUnitInactiveSec=15min
+OnUnitInactiveSec=60s
 AccuracySec=5s
 Unit=shoveactually-analysis-monitor.service
 
