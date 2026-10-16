@@ -49,7 +49,9 @@ export default function GameHistory({ frames, gameId, whiteId, blackId }: {
       <button className="button secondary" onClick={() => setStep(last)} disabled={playing || step === last}>Last</button>
     </nav>
     <p className="game-summary" aria-live="polite">{frame.label}</p>
-    {turnEnd && <ReplayEvaluation key={`${gameId}:${step}`} gameId={gameId} step={step} />}
+    {frame.type === "pushfight" && <div className="replay-evaluation-slot">
+      {turnEnd && <ReplayEvaluation key={`${gameId}:${step}`} gameId={gameId} step={step} />}
+    </div>}
     <label className="history-slider">Jump to step
       <input type="range" disabled={playing} min={0} max={last} value={step} onChange={event => setStep(Number(event.target.value))} />
     </label>
