@@ -63,7 +63,7 @@ test("Push Fight history includes both setups and one frame per completed turn",
   assert.equal(boards[3][1][4], "white-pusher");
   assert.equal(boards[3][1][1], "white-pusher-anchor");
   assert.equal(boards[3][1][0], "empty");
-  assert.deepEqual(frames.map(frame => frame.label), ["Before setup", "White setup", "Black setup", "Turn 1"]);
+  assert.deepEqual(frames.map(frame => frame.label), ["Before setup", "White setup", "Black setup", "Turn 1 ended"]);
 });
 
 test("Push Fight rejects missing setup, null payloads and wrong players", () => {
@@ -97,7 +97,7 @@ test("whole-turn frames match for bundled and legacy turns", () => {
   ] } };
   const frames = completeGameHistory(pushGame, [...setups, twoMoves, blackTurn])!;
   assert.ok(frames);
-  assert.deepEqual(frames.slice(3).map(frame => frame.label), ["Turn 1", "Turn 2"]);
+  assert.deepEqual(frames.slice(3).map(frame => frame.label), ["Turn 1 ended", "Turn 2 ended"]);
   const whiteFrame = frames[3];
   if (whiteFrame.type !== "pushfight") throw new Error("Expected Push Fight");
   assert.deepEqual(whiteFrame.actions?.map(action => action.label), [
@@ -124,10 +124,10 @@ test("push-only and one-move turns each advance one frame", () => {
   ] } };
   const pushOnly = completeGameHistory(pushGame, [...setups, whitePush, blackPush]);
   assert.ok(pushOnly);
-  assert.deepEqual(pushOnly.slice(1).map(frame => frame.label), ["White setup", "Black setup", "Turn 1", "Turn 2"]);
+  assert.deepEqual(pushOnly.slice(1).map(frame => frame.label), ["White setup", "Black setup", "Turn 1 ended", "Turn 2 ended"]);
   const oneMove = completeGameHistory(pushGame, [...setups, turn]);
   assert.ok(oneMove);
-  assert.deepEqual(oneMove.slice(3).map(frame => frame.label), ["Turn 1"]);
+  assert.deepEqual(oneMove.slice(3).map(frame => frame.label), ["Turn 1 ended"]);
 });
 
 

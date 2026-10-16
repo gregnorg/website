@@ -55,7 +55,7 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
               ? `Turn ${turnNumber} Push` : `Turn ${turnNumber} Move ${individualMoves}` });
           }
           if (action.type === "setup" || action.type === "push") {
-            const label = action.type === "setup" ? `${team} setup` : `Turn ${turnNumber}`;
+            const label = action.type === "setup" ? `${team} setup` : `Turn ${turnNumber} ended`;
             frames.push({ type: "pushfight", board: pushBoard, label,
               ...(action.type === "push" ? { actions: turnActions } : {}) });
           }
