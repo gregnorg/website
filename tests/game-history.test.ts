@@ -98,8 +98,13 @@ test("whole-turn frames match for bundled and legacy turns", () => {
   const frames = completeGameHistory(pushGame, [...setups, twoMoves, blackTurn])!;
   assert.ok(frames);
   assert.deepEqual(frames.slice(3).map(frame => frame.label), ["Turn 1 ended", "Turn 2 ended"]);
+  assert.ok(frames.slice(0, 3).every(frame => frame.type === "pushfight" && !frame.turnEnd));
+  const blackFrame = frames[4];
+  assert.ok(blackFrame.type === "pushfight");
+  assert.deepEqual(blackFrame.turnEnd, { nextPlayer: "white", winner: null });
   const whiteFrame = frames[3];
   if (whiteFrame.type !== "pushfight") throw new Error("Expected Push Fight");
+  assert.deepEqual(whiteFrame.turnEnd, { nextPlayer: "black", winner: null });
   assert.deepEqual(whiteFrame.actions?.map(action => action.label), [
     "Turn 1 Move 1", "Turn 1 Move 2", "Turn 1 Push",
   ]);
@@ -140,4 +145,18 @@ test("external endings retain the final unfinished turn as a single frame", () =
   assert.equal(frames[3].type, "pushfight");
   if (frames[3].type !== "pushfight") throw new Error("Expected Push Fight");
   assert.equal(frames[3].board[1][3], "white-pusher");
+  assert.equal(frames[3].turnEnd, undefined);
+});
+
+test("terminal replay turns retain the actual board winner without a tablebase lookup", () => {
+  const whitePush: HistoryMove = { ...turn, payload: { type: "push", index: { row: 1, col: 0 }, dir: "right" } };
+  const blackPush: HistoryMove = { ...turn, move_number: 4, player_id: "black", mark: "O",
+    payload: { type: "push", index: { row: 0, col: 4 }, dir: "left" } };
+  const frames = completeGameHistory({ ...pushGame, winner_id: "black", externalEnding: false }, [...setups, whitePush, blackPush]);
+  assert.ok(frames);
+  const final = frames.at(-1)!;
+  assert.equal(final.type, "pushfight");
+  if (final.type !== "pushfight") throw new Error("Expected Push Fight");
+  assert.equal(final.label, "Turn 2 ended");
+  assert.deepEqual(final.turnEnd, { nextPlayer: "white", winner: "black" });
 });

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { HistoryFrame } from "@/lib/game-history";
+import ReplayEvaluation from "@/components/replay-evaluation";
+import { solverPosition } from "@/lib/pushfight-analysis";
 import PushfightBoard from "@/components/pushfight-board";
 
 export default function GameHistory({ frames, gameId, whiteId, blackId }: {
@@ -36,6 +38,9 @@ export default function GameHistory({ frames, gameId, whiteId, blackId }: {
 
   const playing = animationFrame !== null;
   const last = frames.length - 1;
+  const turnEnd = !playing && frame.type === "pushfight" ? frame.turnEnd : undefined;
+  const position = frame.type === "pushfight" && turnEnd
+    ? solverPosition(frame.board, turnEnd.nextPlayer) : null;
   return <>
     <nav className="history-controls" aria-label="Game history controls">
       <button className="button secondary" onClick={() => setStep(0)} disabled={playing || step === 0}>First</button>
@@ -44,6 +49,7 @@ export default function GameHistory({ frames, gameId, whiteId, blackId }: {
       <button className="button secondary" onClick={() => setStep(last)} disabled={playing || step === last}>Last</button>
     </nav>
     <p className="game-summary" aria-live="polite">{frame.label}</p>
+    {turnEnd && <ReplayEvaluation key={`${gameId}:${step}`} gameId={gameId} step={step} />}
     <label className="history-slider">Jump to step
       <input type="range" disabled={playing} min={0} max={last} value={step} onChange={event => setStep(Number(event.target.value))} />
     </label>
@@ -53,5 +59,10 @@ export default function GameHistory({ frames, gameId, whiteId, blackId }: {
       currentPlayerId="" whitePlayerId={whiteId} blackPlayerId={blackId} canMove={false}
       movesThisTurn={0} action={async () => {}} isSetupPhase={false} setupTeam="white"
       setupTurnPlayerId="" statusMessage="" gameOutcome={null} replayEnabled={false} />}
+    {frame.type === "pushfight" && <footer className="replay-analysis-credit">
+      <p>Experimental analysis by <a href={position?.sourceUrl ?? "https://pushfight.verver.ch/"} target="_blank" rel="noopener noreferrer">Maks Verver’s Push Fight solver</a>.</p>
+      <p>Predictions assume perfect play. Counts are the winning player’s remaining turns.</p>
+      <p>In the analyzer, White is red and Black is blue.</p>
+    </footer>}
   </>;
 }

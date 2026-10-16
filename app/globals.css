@@ -297,3 +297,7 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
   .pushfight-view-actions .game-menu { grid-column:2; width:100%; }
   .pushfight-view-actions .game-menu-trigger { padding:10px 8px; }
 }
+
+.replay-evaluation { margin:8px 0 16px; text-align:center; font-weight:600; }
+.replay-analysis-credit { margin-top:32px; color:var(--muted); font-size:12px; text-align:center; }
+.replay-analysis-credit p { margin:4px 0; }

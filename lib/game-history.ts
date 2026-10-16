@@ -1,3 +1,4 @@
+import type { Team } from "./pushfight-analysis.ts";
 import { EMPTY_BOARD, play, winner, isDraw, type Board as TicBoard } from "./game.ts";
 import { applyMove, emptyBoard, normalizeMovePayload, type Board as PushBoard } from "./pushfight.ts";
 import { currentPlayerId, summarizeTurns, type GameMove, type GameStatus, type GameType } from "./game-state.ts";
@@ -8,7 +9,7 @@ export type HistoryGame = {
   x_player_id: string; o_player_id: string; externalEnding: boolean;
 };
 export type HistoryFrame = { label: string } & (
-  { type: "tic_tac_toe"; board: TicBoard } | { type: "pushfight"; board: PushBoard; actions?: { board: PushBoard; label: string }[] }
+  { type: "tic_tac_toe"; board: TicBoard } | { type: "pushfight"; board: PushBoard; actions?: { board: PushBoard; label: string }[]; turnEnd?: { nextPlayer: Team; winner: Team | null } }
 );
 
 // Fail closed: never skip missing or invalid moves as the live board renderer does.
@@ -57,7 +58,7 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
           if (action.type === "setup" || action.type === "push") {
             const label = action.type === "setup" ? `${team} setup` : `Turn ${turnNumber} ended`;
             frames.push({ type: "pushfight", board: pushBoard, label,
-              ...(action.type === "push" ? { actions: turnActions } : {}) });
+              ...(action.type === "push" ? { actions: turnActions, turnEnd: { nextPlayer: mark === "X" ? "black" : "white", winner: result.winner ?? null } } : {}) });
           }
           if (action.type === "push") {
             turnActions = [];
