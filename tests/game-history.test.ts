@@ -50,9 +50,9 @@ const turn: HistoryMove = { move_number: 3, player_id: "white", mark: "X", posit
 ] } };
 const pushGame = { ...game, game_type: "pushfight" as const, externalEnding: true };
 
-test("Push Fight history includes both setups and each action in a submitted turn", () => {
+test("Push Fight history includes both setups and one frame per completed turn", () => {
   const frames = completeGameHistory(pushGame, [...setups, turn])!;
-  assert.equal(frames.length, 5);
+  assert.equal(frames.length, 4);
   const boards = frames.map(frame => {
     assert.equal(frame.type, "pushfight");
     if (frame.type !== "pushfight") throw new Error("Expected a Push Fight frame");
@@ -60,10 +60,10 @@ test("Push Fight history includes both setups and each action in a submitted tur
   });
   assert.equal(boards[0][1][0], "empty");
   assert.equal(boards[1][1][0], "white-pusher");
-  assert.equal(boards[3][1][3], "white-pusher");
-  assert.equal(boards[4][1][1], "white-pusher-anchor");
-  assert.equal(boards[3][1][0], "white-pusher");
-  assert.deepEqual(frames.map(frame => frame.label), ["Before setup", "White setup", "Black Setup", "Turn 1 Move 1", "Turn 1 Push"]);
+  assert.equal(boards[3][1][4], "white-pusher");
+  assert.equal(boards[3][1][1], "white-pusher-anchor");
+  assert.equal(boards[3][1][0], "empty");
+  assert.deepEqual(frames.map(frame => frame.label), ["Before setup", "White setup", "Black setup", "Turn 1"]);
 });
 
 test("Push Fight rejects missing setup, null payloads and wrong players", () => {
@@ -84,7 +84,7 @@ test("active games never offer history replay", () => {
 });
 
 
-test("turn labels number individual moves and restart after a push for bundled and legacy turns", () => {
+test("whole-turn frames match for bundled and legacy turns", () => {
   if (turn.payload?.type !== "turn") throw new Error("Expected a turn");
   const twoMoves: HistoryMove = { ...turn, payload: { type: "turn", actions: [
     turn.payload.actions[0],
@@ -97,7 +97,7 @@ test("turn labels number individual moves and restart after a push for bundled a
   ] } };
   const frames = completeGameHistory(pushGame, [...setups, twoMoves, blackTurn])!;
   assert.ok(frames);
-  assert.deepEqual(frames.slice(3).map(frame => frame.label), ["Turn 1 Move 1", "Turn 1 Move 2", "Turn 1 Push", "Turn 2 Move 1", "Turn 2 Push"]);
+  assert.deepEqual(frames.slice(3).map(frame => frame.label), ["Turn 1", "Turn 2"]);
   if (twoMoves.payload?.type !== "turn" || blackTurn.payload?.type !== "turn") throw new Error("Expected turns");
   const legacy = [...twoMoves.payload.actions.map(payload => ({ ...twoMoves, payload })),
     ...blackTurn.payload.actions.map(payload => ({ ...blackTurn, payload }))]
@@ -106,7 +106,7 @@ test("turn labels number individual moves and restart after a push for bundled a
 });
 
 
-test("turns without moves show only Push and one-move turns skip Move 2", () => {
+test("push-only and one-move turns each advance one frame", () => {
   const whitePush: HistoryMove = { ...turn, payload: { type: "turn", actions: [
     { type: "push", index: { row: 1, col: 0 }, dir: "right" },
   ] } };
@@ -115,8 +115,20 @@ test("turns without moves show only Push and one-move turns skip Move 2", () => 
   ] } };
   const pushOnly = completeGameHistory(pushGame, [...setups, whitePush, blackPush]);
   assert.ok(pushOnly);
-  assert.deepEqual(pushOnly.slice(1).map(frame => frame.label), ["White setup", "Black Setup", "Turn 1 Push", "Turn 2 Push"]);
+  assert.deepEqual(pushOnly.slice(1).map(frame => frame.label), ["White setup", "Black setup", "Turn 1", "Turn 2"]);
   const oneMove = completeGameHistory(pushGame, [...setups, turn]);
   assert.ok(oneMove);
-  assert.deepEqual(oneMove.slice(3).map(frame => frame.label), ["Turn 1 Move 1", "Turn 1 Push"]);
+  assert.deepEqual(oneMove.slice(3).map(frame => frame.label), ["Turn 1"]);
+});
+
+
+test("external endings retain the final unfinished turn as a single frame", () => {
+  if (turn.payload?.type !== "turn") throw new Error("Expected a turn");
+  const partial = { ...turn, payload: turn.payload.actions[0] };
+  const frames = completeGameHistory(pushGame, [...setups, partial])!;
+  assert.equal(frames.length, 4);
+  assert.equal(frames[3].label, "Turn 1 (incomplete)");
+  assert.equal(frames[3].type, "pushfight");
+  if (frames[3].type !== "pushfight") throw new Error("Expected Push Fight");
+  assert.equal(frames[3].board[1][3], "white-pusher");
 });

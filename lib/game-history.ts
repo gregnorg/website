@@ -49,10 +49,10 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
           const result = applyMove(pushBoard, action, mark === "X" ? "white" : "black");
           pushBoard = result.board;
           boardWinner = result.winner === "white" ? game.x_player_id : result.winner === "black" ? game.o_player_id : null;
-          const label = action.type === "setup" ? `${team} ${team === "White" ? "setup" : "Setup"}`
-            : action.type === "push" ? `Turn ${turnNumber} Push`
-            : `Turn ${turnNumber} Move ${individualMoves}`;
-          frames.push({ type: "pushfight", board: pushBoard, label });
+          if (action.type === "setup" || action.type === "push") {
+            const label = action.type === "setup" ? `${team} setup` : `Turn ${turnNumber}`;
+            frames.push({ type: "pushfight", board: pushBoard, label });
+          }
           if (action.type === "push") {
             individualMoves = 0;
             turnNumber += 1;
@@ -60,6 +60,10 @@ export function completeGameHistory(game: HistoryGame, moves: HistoryMove[]): Hi
         }
       }
       processed.push(move);
+    }
+    // External endings can leave the final turn unfinished.
+    if (game.game_type === "pushfight" && individualMoves > 0) {
+      frames.push({ type: "pushfight", board: pushBoard, label: `Turn ${turnNumber} (incomplete)` });
     }
     if (boardWinner && (game.status !== "won" || boardWinner !== game.winner_id)) return null;
     if (game.status === "won" && (!game.winner_id || (!boardWinner && !game.externalEnding))) return null;
