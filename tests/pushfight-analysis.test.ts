@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { emptyBoard, isValidCoord, type Board, type PushfightCell } from "../lib/pushfight.ts";
 import { solverPosition, solverVerdict } from "../lib/pushfight-analysis.ts";
-import { lookupPushfightAnalysis } from "../lib/pushfight-analysis-service.ts";
+import { lookupPushfightAnalysis, lookupPushfightStatus } from "../lib/pushfight-analysis-service.ts";
 
 // The working 26-character example supplied for Maks Verver's lookup API.
 const example = "..Y.OO........x.xoO.oXX...";
@@ -60,13 +60,13 @@ test("solver results map both next-player perspectives and retain the solver's t
   }
 });
 
-test("lookup sends the normalized position to the fixed upstream URL with a timeout and cache", async t => {
+test("lookup sends normalized positions with a timeout; PostgreSQL owns the durable cache", async t => {
   let calls = 0;
-  t.mock.method(globalThis, "fetch", async (url: string, options: RequestInit & { next?: { revalidate: number } }) => {
+  t.mock.method(globalThis, "fetch", async (url: string, options: RequestInit) => {
     calls++;
     assert.equal(url, `https://styx.verver.ch/pushfight/lookup/perms/${example}`);
     assert.ok(options.signal instanceof AbortSignal);
-    assert.equal(options.next?.revalidate, 86400);
+    assert.equal(options.cache, "no-store");
     return Response.json({ status: "W1", successors: [] });
   });
   assert.equal(await lookupPushfightAnalysis(exampleBoard(), "white"), "White wins in 1 turn");
@@ -84,4 +84,25 @@ test("upstream errors, bad JSON, unexpected outcomes and timeouts yield unavaila
   }
   mock.mock.mockImplementation(async () => { throw new DOMException("timeout", "TimeoutError"); });
   assert.equal(await lookupPushfightAnalysis(exampleBoard(), "white"), null);
+});
+
+
+test("an independently hosted backup is tried only when the primary cannot supply a valid value", async t => {
+  const originalPrimary = process.env.PUSHFIGHT_SOLVER_URL;
+  const originalBackup = process.env.PUSHFIGHT_SOLVER_FALLBACK_URL;
+  process.env.PUSHFIGHT_SOLVER_URL = "http://primary.test/lookup/";
+  process.env.PUSHFIGHT_SOLVER_FALLBACK_URL = "http://backup.test/lookup/";
+  t.after(() => {
+    if (originalPrimary === undefined) delete process.env.PUSHFIGHT_SOLVER_URL;
+    else process.env.PUSHFIGHT_SOLVER_URL = originalPrimary;
+    if (originalBackup === undefined) delete process.env.PUSHFIGHT_SOLVER_FALLBACK_URL;
+    else process.env.PUSHFIGHT_SOLVER_FALLBACK_URL = originalBackup;
+  });
+  const urls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    urls.push(url);
+    return url.includes("primary") ? new Response("offline", { status: 503 }) : Response.json({ status: "L5" });
+  });
+  assert.deepEqual(await lookupPushfightStatus(example), { status: "L5", source: "http://backup.test/lookup" });
+  assert.deepEqual(urls, [`http://primary.test/lookup/perms/${example}`, `http://backup.test/lookup/perms/${example}`]);
 });

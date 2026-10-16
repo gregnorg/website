@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadGameHistory } from "@/lib/game-history-repository";
-import { lookupPushfightAnalysis } from "@/lib/pushfight-analysis-service";
+import { pool } from "@/lib/db";
+import { cachedReplayAnalysis } from "@/lib/replay-analysis-cache";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const step = new URL(request.url).searchParams.get("step");
@@ -14,11 +15,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (frame?.type !== "pushfight" || !frame.turnEnd) {
     return NextResponse.json({ error: "Completed replay turn not found." }, { status: 404 });
   }
-  const label = frame.turnEnd.winner
-    ? `${frame.turnEnd.winner === "white" ? "White" : "Black"} wins`
-    : await lookupPushfightAnalysis(frame.board, frame.turnEnd.nextPlayer);
-  return NextResponse.json({ label: label ?? "Analysis unavailable" }, {
-    status: label ? 200 : 503,
-    headers: { "Cache-Control": label ? "private, max-age=86400" : "no-store" },
+  const result = await cachedReplayAnalysis(pool, history!.game.id, frame);
+  return NextResponse.json(result, {
+    status: result.pending ? 202 : 200,
+    headers: { "Cache-Control": result.pending ? "no-store" : "private, max-age=86400" },
   });
 }

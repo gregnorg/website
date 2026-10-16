@@ -1,8 +1,9 @@
+import type { PoolClient } from "pg";
 import { pool } from "./db.ts";
 import { completeGameHistory, type HistoryGame, type HistoryMove } from "./game-history.ts";
 
-export async function loadGameHistory(id: string) {
-  const result = await pool.query<HistoryGame & { id: string; game_number: string; white_name: string; black_name: string }>(
+export async function loadGameHistory(id: string, db: Pick<PoolClient, "query"> = pool) {
+  const result = await db.query<HistoryGame & { id: string; game_number: string; white_name: string; black_name: string }>(
     `SELECT g.id, g.game_number, g.game_type, g.status, g.winner_id,
             w.user_id AS x_player_id, b.user_id AS o_player_id,
             wu.username AS white_name, bu.username AS black_name,
@@ -17,7 +18,7 @@ export async function loadGameHistory(id: string) {
   );
   const game = result.rows[0];
   if (!game) return null;
-  const moves = await pool.query<HistoryMove>(
+  const moves = await db.query<HistoryMove>(
     `SELECT m.move_number, m.position, m.payload, m.player_id, gp.mark FROM moves m
      LEFT JOIN game_players gp ON gp.game_id = m.game_id AND gp.user_id = m.player_id
      WHERE m.game_id = $1 ORDER BY m.move_number`, [game.id],

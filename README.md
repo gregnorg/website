@@ -233,3 +233,14 @@ with the `.service` suffix. Project instructions are stored in `AGENTS.md`.
 - `scripts/apply-migration.js` — helper for applying DB schema migrations from `.env.local`
 
 Games and their complete ordered move histories (including Pushfight setups and all actions in submitted turns) are retained permanently. Clearing a finished game only hides it from that player’s list. Leaderboards include results from the last 30 days; older games remain stored. Admin account deletion is available only for accounts without game history.
+
+### Experimental replay analysis
+
+Completed Push Fight games queue background analysis of all completed turns.
+Results are stored permanently in PostgreSQL and reused across games. Replays
+read saved results without querying the public solver. Migration 019 and the
+separate minute timer are required; after migration/build/deployment, run
+`sudo bash deploy/install-analysis.sh`. See
+[replay analysis operations and outage fallbacks](docs/replay-solver-experiment.md)
+for retry behavior, optional independent backup/self-hosted endpoints, and the
+pre-experiment rollback tag.

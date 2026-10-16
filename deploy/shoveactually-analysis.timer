@@ -1,0 +1,11 @@
+[Unit]
+Description=Process completed-game replay analysis every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=5s
+Unit=shoveactually-analysis.service
+
+[Install]
+WantedBy=timers.target

@@ -59,6 +59,8 @@ install -d -m 0700 -o "${APP_USER}" -g "${APP_GROUP}" /var/backups/turntable
 render_unit "${WEBSITE_DIR}/deploy/shoveactually-push-monitor.service" /etc/systemd/system/shoveactually-push-monitor.service
 install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-push-monitor.timer" /etc/systemd/system/shoveactually-push-monitor.timer
 sudo -u "${APP_USER}" "${NODE_BIN}" --env-file="${WEBSITE_DIR}/.env.local" "${WEBSITE_DIR}/scripts/configure-push-monitor.ts"
+render_unit "${WEBSITE_DIR}/deploy/shoveactually-analysis.service" /etc/systemd/system/shoveactually-analysis.service
+install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-analysis.timer" /etc/systemd/system/shoveactually-analysis.timer
 systemctl daemon-reload
 systemctl enable --now postgresql
 systemctl enable shoveactually cloudflared shoveactually-backup.timer shoveactually-healthcheck.timer shoveactually-idle-games.timer cloudflared-update.timer
@@ -68,7 +70,7 @@ systemctl start shoveactually-backup.service
 systemctl start shoveactually-backup.timer
 systemctl start shoveactually-healthcheck.service
 systemctl start shoveactually-healthcheck.timer
-systemctl enable --now shoveactually-push.timer shoveactually-push-monitor.timer
+systemctl enable --now shoveactually-push.timer shoveactually-push-monitor.timer shoveactually-analysis.timer
 systemctl start shoveactually-idle-games.timer
 systemctl start shoveactually-idle-games.service
 
