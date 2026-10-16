@@ -22,7 +22,15 @@ sed \
   "${WEBSITE_DIR}/deploy/shoveactually-analysis.service" > /etc/systemd/system/shoveactually-analysis.service
 chmod 0644 /etc/systemd/system/shoveactually-analysis.service
 install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-analysis.timer" /etc/systemd/system/shoveactually-analysis.timer
+sed \
+  -e "s|@@APP_USER@@|${APP_USER}|g" \
+  -e "s|@@APP_GROUP@@|${APP_GROUP}|g" \
+  -e "s|@@WEBSITE_DIR@@|${WEBSITE_DIR}|g" \
+  -e "s|@@NODE_BIN@@|${NODE_BIN}|g" \
+  "${WEBSITE_DIR}/deploy/shoveactually-analysis-monitor.service" > /etc/systemd/system/shoveactually-analysis-monitor.service
+chmod 0644 /etc/systemd/system/shoveactually-analysis-monitor.service
+install -m 0644 "${WEBSITE_DIR}/deploy/shoveactually-analysis-monitor.timer" /etc/systemd/system/shoveactually-analysis-monitor.timer
 systemctl daemon-reload
-systemctl enable --now shoveactually-analysis.timer
-systemctl start shoveactually-analysis.service
+systemctl enable --now shoveactually-analysis.timer shoveactually-analysis-monitor.timer
+systemctl start shoveactually-analysis.service shoveactually-analysis-monitor.service
 systemctl --no-pager --full status shoveactually-analysis.timer

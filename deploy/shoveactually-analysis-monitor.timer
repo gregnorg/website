@@ -1,0 +1,11 @@
+[Unit]
+Description=Check the primary Push Fight solver every fifteen minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=15min
+AccuracySec=5s
+Unit=shoveactually-analysis-monitor.service
+
+[Install]
+WantedBy=timers.target

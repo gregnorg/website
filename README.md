@@ -238,9 +238,10 @@ Games and their complete ordered move histories (including Pushfight setups and 
 
 Completed Push Fight games queue background analysis of all completed turns.
 Results are stored permanently in PostgreSQL and reused across games. Replays
-read saved results without querying the public solver. Migration 019 and the
-separate minute timer are required; after migration/build/deployment, run
+read saved results without querying the public solver. Migrations 019–020 and the
+separate worker/monitor timers are required; after migration/build/deployment, run
 `sudo bash deploy/install-analysis.sh`. See
 [replay analysis operations and outage fallbacks](docs/replay-solver-experiment.md)
-for retry behavior, optional independent backup/self-hosted endpoints, and the
+for retry behavior, one admin email after a primary outage exceeds 24 hours,
+optional independent backup/self-hosted endpoints, and the
 pre-experiment rollback tag.

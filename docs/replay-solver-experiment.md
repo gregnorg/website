@@ -3,13 +3,13 @@
 Rollback checkpoint: annotated Git tag `before-replay-solver-experiment`, at
 `ebe47d6` (the deployed replay with “Turn # ended” labels). Revert the experiment
 commits after that tag and disable `shoveactually-analysis.timer` before deploying
-the old application. Keep the analysis tables so saved results are not lost.
+the old application. Also disable `shoveactually-analysis-monitor.timer`. Keep the analysis tables so saved results are not lost.
 
 ## Completed-game caching
 
 Migration `019_add_replay_analysis_cache.sql` adds a transactional completion
 trigger, a resumable job queue, a permanent position cache, and a shared provider
-cooldown. Apply it with `npm run migrate` before deploying this version.
+cooldown. Migration 020 adds the outage monitor state. Apply both with `npm run migrate` before deploying this version.
 Every Push Fight win, resignation, timeout, agreed draw, or cancellation queues
 one game. The trigger covers every ending path without putting network requests
 inside gameplay transactions. Existing finished games are backfilled gradually.
@@ -21,7 +21,8 @@ usual build/restart deployment, install it with:
 sudo bash deploy/install-analysis.sh
 ```
 
-For fresh installations, `deploy/install-production.sh` also installs the timer.
+The installer enables both the analysis worker and its independent outage monitor.
+For fresh installations, `deploy/install-production.sh` also installs both timers.
 A manual batch is `npm run games:analyze`. The worker makes at most 20 position
 lookups per batch, waits at least one second between them, and stops starting new
 lookups after 45 seconds. An advisory lock prevents overlapping invocations.
@@ -69,6 +70,36 @@ Requests time out after eight seconds per configured endpoint. Worker failures
 are visible in `journalctl -u shoveactually-analysis.service`; pending game and
 provider details are in `pushfight_analysis_jobs` and
 `pushfight_analysis_provider_state`.
+
+## Admin outage alerts
+
+`shoveactually-analysis-monitor.timer` checks the configured primary lookup API
+with a known valid position every 15 minutes, even if no game needs analysis.
+It bypasses the permanent cache and excludes fallback endpoints, so a working
+backup cannot hide a primary outage. These low-frequency health probes are the
+only regular upstream requests unrelated to newly finished games.
+
+After more than 24 hours of consecutive failed checks, the monitor emails all
+current, non-banned site admins, using the existing `RESEND_API_KEY` and
+`RESEND_FROM_EMAIL` settings. It sends one alert per outage, with no repeated
+reminders. A successful check clears the incident and enables alerts for a
+future outage. Changing the configured primary starts a fresh monitoring period.
+
+Incident and sent-alert timestamps survive worker/application restarts. Failed
+email delivery is retried at the next monitor check with the same idempotency
+key. No email is sent merely because a single position cannot be analyzed or
+because the background worker is in its retry cooldown.
+
+For a manual probe without state changes or email:
+
+```sh
+node --env-file=.env.local scripts/check-replay-analysis.ts --dry-run
+```
+
+Inspect `journalctl -u shoveactually-analysis-monitor.service` for monitoring or
+email delivery failures, and `pushfight_analysis_monitor_state` for the current
+incident. The actual alert is sent at the first scheduled check after the
+24-hour threshold, so detection has approximately 15-minute scheduling resolution.
 
 ## Solver conventions and attribution
 

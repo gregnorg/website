@@ -11,9 +11,9 @@ export function solverEndpoints(): string[] {
 
 // Only the background worker calls upstream; durable PostgreSQL values are the
 // authority for replay, rather than an expiring Next.js fetch cache.
-export async function lookupPushfightStatus(permutation: string): Promise<SolverValue | null> {
+export async function lookupPushfightStatus(permutation: string, endpoints: string[] = solverEndpoints()): Promise<SolverValue | null> {
   if (!/^[.oOxXY]{26}$/.test(permutation)) return null;
-  for (const endpoint of solverEndpoints()) {
+  for (const endpoint of endpoints) {
     try {
       const response = await fetch(`${endpoint}/perms/${permutation}`, {
         signal: AbortSignal.timeout(8_000), cache: "no-store",
