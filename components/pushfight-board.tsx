@@ -188,7 +188,7 @@ export default function PushfightBoard({
         const index = setupSelection.findIndex((coord) => coordEquals(coord, { row: rowIndex, col: colIndex }));
         return index !== -1 && cell === "empty" ? buildPreviewPiece(myColor, index) : cell;
       }))
-    : stagedBoard);
+    : spectator ? board : stagedBoard);
 
   const legalTargets: LegalTarget[] = [];
   if (!isSetupPhase && selectedPiece && !turnComplete) {

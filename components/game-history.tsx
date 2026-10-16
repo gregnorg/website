@@ -49,7 +49,7 @@ export default function GameHistory({ frames, gameId, whiteId, blackId }: {
     </label>
     {frame.type === "tic_tac_toe" ? <div className="game-board" aria-label="Historical tic-tac-toe board">
       {frame.board.map((cell, index) => <button type="button" disabled className="game-square" key={index} aria-label={`Square ${index + 1}: ${cell ?? "empty"}`}>{cell}</button>)}
-    </div> : <PushfightBoard key={step} board={frame.board} gameId={gameId} spectator myId="spectator"
+    </div> : <PushfightBoard board={frame.board} gameId={gameId} spectator myId="spectator"
       currentPlayerId="" whitePlayerId={whiteId} blackPlayerId={blackId} canMove={false}
       movesThisTurn={0} action={async () => {}} isSetupPhase={false} setupTeam="white"
       setupTurnPlayerId="" statusMessage="" gameOutcome={null} replayEnabled={false} />}
