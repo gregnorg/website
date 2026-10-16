@@ -23,6 +23,21 @@ sudo bash deploy/install-analysis.sh
 
 The installer enables both the analysis worker and its independent outage monitor.
 For fresh installations, `deploy/install-production.sh` also installs both timers.
+When system-service installation requires an unavailable sudo password, use the
+application account's persistent cron instead (choose one scheduler):
+
+```sh
+bash deploy/install-analysis-cron.sh
+```
+
+This preserves unrelated cron entries and installs one idempotent minute job.
+It uses an absolute Node path, a non-overlapping lock, and runs the monitor even
+if the worker fails. Logs are available with `journalctl -t shoveactually-analysis`
+and `journalctl -t shoveactually-analysis-monitor`. Preview the exact cron entry
+with `bash deploy/install-analysis-cron.sh --print`. To roll back this deployment,
+remove the block labeled `SHOVEACTUALLY REPLAY ANALYSIS` from the app user's
+crontab instead of disabling system timers.
+
 A manual batch is `npm run games:analyze`. The worker makes at most 20 position
 lookups per batch, waits at least one second between them, and stops starting new
 lookups after 45 seconds. An advisory lock prevents overlapping invocations.
