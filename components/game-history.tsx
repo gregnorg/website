@@ -12,18 +12,19 @@ export default function GameHistory({ frames, gameId, whiteId, blackId }: {
   const [step, setStep] = useState(0);
   const [animationFrame, setAnimationFrame] = useState<HistoryFrame | null>(null);
   const timers = useRef<number[]>([]);
-  const animating = useRef(false);
   useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
   const frame = animationFrame ?? frames[step];
 
   function nextTurn() {
-    if (animating.current || step >= frames.length - 1) return;
+    timers.current.forEach(window.clearTimeout);
+    timers.current = [];
+    setAnimationFrame(null);
+    if (step >= frames.length - 1) return;
     const next = frames[step + 1];
     if (next.type !== "pushfight" || !next.actions?.length) {
       setStep(step + 1);
       return;
     }
-    animating.current = true;
     setAnimationFrame(frames[step]);
     setStep(step + 1);
     timers.current = next.actions.map((action, index) => window.setTimeout(() => {
@@ -31,7 +32,6 @@ export default function GameHistory({ frames, gameId, whiteId, blackId }: {
     }, 650 * (index + 1)));
     timers.current.push(window.setTimeout(() => {
       setAnimationFrame(null);
-      animating.current = false;
       timers.current = [];
     }, 650 * (next.actions.length + 1)));
   }
@@ -45,7 +45,7 @@ export default function GameHistory({ frames, gameId, whiteId, blackId }: {
     <nav className="history-controls" aria-label="Game history controls">
       <button className="button secondary" onClick={() => setStep(0)} disabled={playing || step === 0}>First</button>
       <button className="button secondary" onClick={() => setStep(step - 1)} disabled={playing || step === 0}>Previous</button>
-      <button className="button" onClick={nextTurn} disabled={playing || step === last}>Next</button>
+      <button className="button" onClick={nextTurn} disabled={!playing && step === last}>Next</button>
       <button className="button secondary" onClick={() => setStep(last)} disabled={playing || step === last}>Last</button>
     </nav>
     <label className="history-slider">Jump to step
