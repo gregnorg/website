@@ -27,7 +27,7 @@ export default async function AllGamesPage({ searchParams }: {
           JOIN game_players bp ON bp.game_id = g.id AND bp.mark = 'O'
           JOIN "user" w ON w.id = wp.user_id
           JOIN "user" b ON b.id = bp.user_id
-         WHERE (NOT g.idle_expired OR g.status = 'won') AND g.status = ANY($1::game_status[])
+         WHERE g.tournament_id IS NULL AND (NOT g.idle_expired OR g.status = 'won') AND g.status = ANY($1::game_status[])
            AND ($2 = '' OR strpos(lower(w.username), lower($2)) > 0
                 OR strpos(lower(b.username), lower($2)) > 0 OR g.game_number::text = $3)
          ORDER BY g.updated_at DESC, g.game_number DESC LIMIT 31 OFFSET $4`,

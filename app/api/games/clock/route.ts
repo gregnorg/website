@@ -42,7 +42,7 @@ export async function POST(request: Request) {
          JOIN game_players me ON me.game_id = g.id AND me.user_id = $2
          JOIN game_players xplayer ON xplayer.game_id = g.id AND xplayer.mark = 'X'
          JOIN game_players oplayer ON oplayer.game_id = g.id AND oplayer.mark = 'O'
-        WHERE g.id = $1
+        WHERE g.id = $1 AND g.tournament_id IS NULL
         FOR UPDATE OF g`,
       [gameId, session.user.id],
     );

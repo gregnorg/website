@@ -246,3 +246,13 @@ for increasing retry delays, a 24-hour admin warning, a one-week stop notice,
 and explicit manual resume,
 optional independent backup/self-hosted endpoints, and the
 pre-experiment rollback tag.
+
+### Live tournaments
+
+Admins create named Push Fight tournaments with 4–8 selected members and any positive whole number of minutes per player. Multiple tournaments can run together. Brackets are randomly seeded, use byes for 5–7 players, and advance automatically. Draws create a fresh rematch. Admins can cancel a whole tournament.
+
+The Live tournaments tab appears for signed-in members while a tournament is active. Members can enter or spectate games there. A server-sent event stream refreshes tournament state within about half a second of committed moves. Tournament games stay out of My Games, All Games, player rankings, streaks, and championship transfers.
+
+Tournament clocks start only after both setups are complete. Server timestamps keep time while players are disconnected, preserving the existing ten-second delay each turn. The Node server's instrumentation starts a maintenance loop that adjudicates timeouts every second, advances brackets, deletes games and brackets 24 hours after completion/cancellation, and deletes tournament summaries after 30 days. Downtime is accounted for when the server returns; maintenance never needs a browser to stay open.
+
+Apply migration `022_live_tournaments.sql` with `npm run migrate` before deploying this version. No separate tournament service is needed.

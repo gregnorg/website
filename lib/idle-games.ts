@@ -38,7 +38,7 @@ export async function processIdleGame(
         JOIN game_players op ON op.game_id = g.id AND op.mark = 'O'
         JOIN "user" x ON x.id = xp.user_id
         JOIN "user" o ON o.id = op.user_id
-       WHERE g.id = $1 AND g.status = 'active'
+       WHERE g.tournament_id IS NULL AND g.id = $1 AND g.status = 'active'
        FOR UPDATE OF g SKIP LOCKED`, [gameId]);
   const game = result.rows[0];
   if (!game) return "skipped";

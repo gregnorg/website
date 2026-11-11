@@ -1,3 +1,4 @@
+import { createTournament } from "@/app/tournaments/actions";
 import { pool } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 import { deleteAccount } from "./actions";
@@ -26,6 +27,14 @@ export default async function AdminPage({ searchParams }: Props) {
       {params.error && <p className="error admin-message">{params.error}</p>}
       {params.success && <p className="success admin-message">{params.success}</p>}
 
+      <h2>Create live tournament</h2>
+      <form action={createTournament} className="tournament-form">
+        <label>Tournament name <input name="name" maxLength={100} required /></label>
+        <label>Minutes per player <input name="minutes" type="number" min="1" max="35791394" step="1" defaultValue="5" required /></label>
+        <fieldset><legend>Select 4–8 members</legend><div className="tournament-members">{users.rows.map(user=><label key={user.id}><input type="checkbox" name="members" value={user.id}/>{user.username}</label>)}</div></fieldset>
+        <p>Random single elimination bracket, with byes when needed. No acceptance required. Clocks begin after both players set up, with a 10-second bonus each turn.</p>
+        <button className="button">Create and start tournament</button>
+      </form>
       <h2>Players</h2>
       <div className="admin-list">
         {users.rows.map((user) => <article className="admin-card" key={user.id}>
@@ -38,7 +47,7 @@ export default async function AdminPage({ searchParams }: Props) {
         </article>)}
       </div>
 
-      <p>Games and their complete move histories are retained permanently. Accounts with game history cannot be deleted.</p>
+      <p>Regular games and their complete move histories are retained permanently. Tournament games are deleted 24 hours after the tournament ends. Accounts with game history cannot be deleted.</p>
 
       <h2>Recent admin activity</h2>
       <div className="admin-list">{audit.rows.length === 0 ? <p>No admin actions yet.</p> : audit.rows.map((entry, index) => <article className="admin-card" key={`${entry.created_at.toISOString()}-${index}`}><div><strong>{entry.admin_username}: {entry.action}</strong><p>{entry.target_label} · {entry.created_at.toLocaleString()}</p></div></article>)}</div>

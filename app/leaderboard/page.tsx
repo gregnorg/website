@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { pool } from "@/lib/db";
 import { getLeaderboards, type LeaderboardPlayer } from "@/lib/leaderboard";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +23,14 @@ function Ranking({ players, value }: {
 
 export default async function LeaderboardPage() {
   const boards = await getLeaderboards();
+  const tournaments = await pool.query<{id:string;name:string;winner_name:string;finished_at:Date}>("SELECT id,name,winner_name,finished_at FROM tournaments WHERE status='completed' AND finished_at>now()-interval '30 days' ORDER BY finished_at DESC");
 
   return (
     <section className="page leaderboard-page">
       <p className="kicker">Hall of push</p>
       <h1>Leaderboards</h1>
       <p className="leaderboard-window-note">Rankings reflect completed games from the last 30 days only. Older results automatically fall out of the rankings.</p>
+      <article className="leaderboard-card"><h2>Tournament winners · Last 30 days</h2><p>Tournament games do not affect player rankings or the championship.</p>{tournaments.rows.length ? <ul>{tournaments.rows.map(t=><li key={t.id}><Link href="/tournaments"><strong>{t.name}</strong></Link> · {t.finished_at.toLocaleDateString("en-US",{timeZone:"America/Denver"})} · Winner: {t.winner_name}</li>)}</ul> : <p>No completed tournaments yet.</p>}</article>
       <div className="leaderboard-grid">
         <article className="leaderboard-card">
           <h2>Winning percentage</h2>

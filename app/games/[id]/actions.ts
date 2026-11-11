@@ -1,5 +1,6 @@
 "use server";
 
+import { lockTournamentGame, settleTournament, settleTournamentClock } from "@/lib/tournaments";
 import { after } from "next/server";
 import { sendCrownAnnouncements } from "@/lib/crown-email";
 
@@ -25,7 +26,9 @@ export async function resignGame(formData: FormData) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const tournamentId = await lockTournamentGame(client, gameId);
     await resignGameForPlayer(client, gameId, session.user.id);
+    if (tournamentId) await settleTournament(client, tournamentId);
     await client.query("COMMIT");
     after(sendCrownAnnouncements);
   } catch (error) {
@@ -53,6 +56,7 @@ export async function makeMove(formData: FormData) {
   let message = "";
   try {
     await client.query("BEGIN");
+    const tournamentId = await lockTournamentGame(client, gameId);
     const game = await getMoveGameForPlayer(client, gameId, session.user.id);
     if (!game) {
       await client.query("ROLLBACK");
@@ -118,7 +122,7 @@ export async function makeMove(formData: FormData) {
             [gameId, session.user.id],
           );
           const loserId = players.rows.find((row) => row.user_id !== session.user.id)?.user_id;
-          if (loserId) await transferChampionship(client, session.user.id, loserId);
+          if (loserId && !tournamentId) await transferChampionship(client, session.user.id, loserId);
         } else if (isDraw(nextBoard)) {
           await client.query(
             `UPDATE games SET status = 'draw', draw_offered_by_id = NULL, draw_offer_id = NULL, updated_at = now() WHERE id = $1`,
@@ -130,6 +134,7 @@ export async function makeMove(formData: FormData) {
             [gameId],
           );
         }
+        if (tournamentId) await settleTournament(client, tournamentId);
         await client.query("COMMIT");
         after(sendCrownAnnouncements);
         if (!winningMark && !isDraw(nextBoard)) {
@@ -221,6 +226,11 @@ export async function makeMove(formData: FormData) {
     } else {
       try {
         const result = applyMove(pfBoard, actionPayload, playerColor);
+        if (tournamentId) {
+          await settleTournamentClock(client, gameId, true);
+          const clockState = await client.query("SELECT status FROM games WHERE id=$1", [gameId]);
+          if (clockState.rows[0].status !== "active") throw new Error("Your clock has expired.");
+        }
         await client.query(
           `INSERT INTO moves (game_id, player_id, payload, move_number)
            VALUES ($1, $2, $3, $4)`,
@@ -233,10 +243,11 @@ export async function makeMove(formData: FormData) {
             `UPDATE games SET status = 'won', winner_id = $2, draw_offered_by_id = NULL, draw_offer_id = NULL, updated_at = now() WHERE id = $1`,
             [gameId, winnerId],
           );
-          await transferChampionship(client, winnerId, loserId);
+          if (!tournamentId) await transferChampionship(client, winnerId, loserId);
         } else {
           await client.query("UPDATE games SET updated_at = now() WHERE id = $1", [gameId]);
         }
+        if (tournamentId) await settleTournament(client, tournamentId);
         await client.query("COMMIT");
         after(sendCrownAnnouncements);
         if (!result.winner) {
@@ -291,9 +302,11 @@ export async function manageDrawOffer(formData: FormData) {
   let changed = false;
   try {
     await client.query("BEGIN");
+    const tournamentId = await lockTournamentGame(client, gameId);
     changed = response === "offer"
       ? await offerDrawForPlayer(client, gameId, session.user.id)
       : await respondToDrawForPlayer(client, gameId, session.user.id, offerId, response);
+    if (tournamentId) await settleTournament(client, tournamentId);
     await client.query("COMMIT");
     after(sendCrownAnnouncements);
   } catch (error) {

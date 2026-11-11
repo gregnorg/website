@@ -20,7 +20,7 @@ export async function gamesWaitingForMove(userId: string) {
        JOIN game_players xplayer ON xplayer.game_id = g.id AND xplayer.mark = 'X'
        JOIN game_players oplayer ON oplayer.game_id = g.id AND oplayer.mark = 'O'
        LEFT JOIN moves m ON m.game_id = g.id
-      WHERE g.status = 'active' AND me.cleared_at IS NULL
+      WHERE g.tournament_id IS NULL AND g.status = 'active' AND me.cleared_at IS NULL
       GROUP BY g.id, xplayer.user_id, oplayer.user_id`,
     [userId],
   );

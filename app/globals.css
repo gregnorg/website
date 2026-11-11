@@ -304,3 +304,12 @@ input:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px;
 .replay-evaluation { margin:0; text-align:center; font-weight:600; line-height:1.4; }
 .replay-analysis-credit { margin-top:32px; color:var(--muted); font-size:12px; text-align:center; }
 .replay-analysis-credit p { margin:4px 0; }
+
+.tournament-form { display: grid; gap: 1rem; max-width: 48rem; margin-bottom: 2rem; }
+.tournament-form > label { display: grid; gap: .4rem; }
+.tournament-members { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: .75rem; }
+.tournament-members label { display: flex; gap: .5rem; align-items: center; }
+.tournament-members input { width: auto; }
+.tournament-card { margin: 2rem 0; padding: 1rem; border: 1px solid #ccc; border-radius: 12px; }
+.tournament-bracket { display: grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: 1rem; }
+.tournament-bracket .admin-card { margin-bottom: .75rem; }

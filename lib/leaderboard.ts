@@ -26,7 +26,7 @@ export async function getLeaderboards(database: Pick<PoolClient, "query"> = pool
          FROM "user" u
          LEFT JOIN game_players gp ON gp.user_id = u.id
          LEFT JOIN games g
-           ON g.id = gp.game_id
+           ON g.id = gp.game_id AND g.tournament_id IS NULL
           AND g.updated_at >= now() - interval '30 days'
         GROUP BY u.id, u.username`,
     ),
@@ -35,7 +35,7 @@ export async function getLeaderboards(database: Pick<PoolClient, "query"> = pool
               ARRAY_AGG(gp.user_id ORDER BY gp.user_id) AS player_ids
          FROM games g
          JOIN game_players gp ON gp.game_id = g.id
-        WHERE g.status IN ('won', 'draw')
+        WHERE g.tournament_id IS NULL AND g.status IN ('won', 'draw')
           AND g.updated_at >= now() - interval '30 days'
         GROUP BY g.id
         ORDER BY g.updated_at DESC, g.id DESC`,

@@ -32,13 +32,14 @@ export async function createGameRecord(
   opponentId: string,
   gameType: GameType,
   creatorMark: PlayerMark = randomInt(2) === 0 ? "X" : "O",
-  timeControlSeconds: 300 | 600 | 1200 | null = 300,
+  timeControlSeconds: number | null = 300,
+  tournamentId: string | null = null,
 ): Promise<string> {
   const game = await client.query<{ id: string }>(
-    `INSERT INTO games (created_by, status, game_type, time_control_seconds)
-     VALUES ($1, 'active', $2, $3)
+    `INSERT INTO games (created_by, status, game_type, time_control_seconds, tournament_id)
+     VALUES ($1, 'active', $2, $3, $4)
      RETURNING id`,
-    [creatorId, gameType, timeControlSeconds],
+    [creatorId, gameType, timeControlSeconds, tournamentId],
   );
   const gameId = game.rows[0].id;
   const opponentMark: PlayerMark = creatorMark === "X" ? "O" : "X";
@@ -85,10 +86,12 @@ export async function resignGameForPlayer(
         AND g.id = $1
         AND me.user_id = $2
         AND g.status = 'active'
-      RETURNING opponent.user_id AS winner_id`,
+      RETURNING opponent.user_id AS winner_id, g.tournament_id`,
     [gameId, playerId],
   );
-  if (result.rows[0]) await transferChampionship(client, result.rows[0].winner_id, playerId);
+  if (result.rows[0] && !result.rows[0].tournament_id) {
+    await transferChampionship(client, result.rows[0].winner_id, playerId);
+  }
   return result.rowCount === 1;
 }
 

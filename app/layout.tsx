@@ -1,3 +1,4 @@
+import { TournamentLive } from "@/components/tournament-live";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -49,9 +50,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       ])
     : [false, 0, null];
 
+  const activeTournaments = session ? (await pool.query("SELECT 1 FROM tournaments WHERE status='active' LIMIT 1")).rowCount : 0;
   return (
     <html lang="en">
       <body>
+        {session && <TournamentLive/>}
         <PwaRegistration userId={session?.user.id ?? null} />
         {session && <AppIconBadge initialCount={turnCount} />}
         {session && <AppIconAlertPrompt />}
@@ -65,6 +68,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
                 </Link>
                 <Link href="/games">My Games</Link>
                 <Link href="/games/all">All Games</Link>
+                {activeTournaments ? <Link href="/tournaments">Live tournaments</Link> : null}
                 <Link href="/leaderboard">Leaderboard</Link>
                 {admin && <Link href="/admin">Admin</Link>}
                 <SignOutLink />

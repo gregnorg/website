@@ -56,7 +56,7 @@ export default async function GamesPage({ searchParams }: {
          ON oplayer.game_id = g.id AND oplayer.mark = 'O'
        LEFT JOIN moves m
          ON m.game_id = g.id
-      WHERE ${MY_GAME_FINISHED_SQL} = $2
+      WHERE g.tournament_id IS NULL AND ${MY_GAME_FINISHED_SQL} = $2
       GROUP BY g.id, me.mark, xplayer.user_id, oplayer.user_id, opponent.id, opponent.username
       ORDER BY g.updated_at DESC`,
     [session.user.id, finished],

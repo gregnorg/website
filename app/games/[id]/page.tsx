@@ -1,3 +1,5 @@
+import { TournamentClocks } from "@/components/tournament-clocks";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -38,6 +40,8 @@ export default async function GamePage({
 
   const [gameResult, championResult] = await Promise.all([pool.query<{
     id: string;
+    tournament_id: string | null;
+    clock_started_at: Date | null;
     game_number: string;
     my_username: string;
     status: GameStatus;
@@ -55,7 +59,7 @@ export default async function GamePage({
     my_time_remaining_ms: string | null;
     opponent_time_remaining_ms: string | null;
   }>(
-    `SELECT g.id, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
+    `SELECT g.id, g.tournament_id, g.clock_started_at, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
             me.mark AS my_mark, me.time_remaining_ms AS my_time_remaining_ms,
             them.time_remaining_ms AS opponent_time_remaining_ms,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
@@ -77,6 +81,7 @@ export default async function GamePage({
   ), pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true")]);
   if (!gameResult.rowCount) notFound();
   const game = gameResult.rows[0];
+  if (game.tournament_id && !session) redirect("/login");
   const id = game.id;
   const viewerId = session?.user.id ?? "";
   const isPlayer = viewerId === game.x_player_id || viewerId === game.o_player_id;
@@ -137,7 +142,7 @@ export default async function GamePage({
   }
 
   let nextTurnGameId: string | null = null;
-  if (isPlayer && moved === "1") {
+  if (isPlayer && moved === "1" && !game.tournament_id) {
     const candidates = await pool.query<{
       id: string;
       game_type: GameType;
@@ -161,7 +166,7 @@ export default async function GamePage({
          JOIN game_players oplayer
            ON oplayer.game_id = g.id AND oplayer.mark = 'O'
          LEFT JOIN moves m ON m.game_id = g.id
-        WHERE g.status = 'active' AND me.cleared_at IS NULL AND g.id <> $2
+        WHERE g.tournament_id IS NULL AND g.status = 'active' AND me.cleared_at IS NULL AND g.id <> $2
         GROUP BY g.id, xplayer.user_id, oplayer.user_id
         ORDER BY g.updated_at DESC`,
       [viewerId, id],
@@ -226,18 +231,23 @@ export default async function GamePage({
 
   return (
     <section className="game-page">
+      {game.tournament_id && <Link href="/tournaments">← Live tournaments</Link>}
       <RefreshOnReturn
         poll={game.status === "active"}
-        automatic={!(isPlayer && game.status === "active" && game.time_control_seconds !== null)}
+        automatic={!game.tournament_id && !(isPlayer && game.status === "active" && game.time_control_seconds !== null)}
       />
       <p className="kicker game-heading">Game #{game.game_number}{!isPlayer && " · Spectating"}</p>
       {isPlayer && moved === "1" && (
         <div className="after-move" role="status">
           <span>Move submitted.</span>
-          {nextTurnGameId ? <Link href={`/games/${nextTurnGameId}`}>Play your next game →</Link> : <Link href="/games">View my games</Link>}
+          {game.tournament_id ? <Link href="/tournaments">View tournament bracket →</Link> : nextTurnGameId ? <Link href={`/games/${nextTurnGameId}`}>Play your next game →</Link> : <Link href="/games">View my games</Link>}
         </div>
       )}
-      <GameClocks
+      {game.tournament_id ? <TournamentClocks myColor={game.my_mark === "X" ? "white" : "black"} myName={game.my_username} opponentName={game.opponent_username}
+        myRemainingMs={Number(game.my_time_remaining_ms??0)} opponentRemainingMs={Number(game.opponent_time_remaining_ms??0)}
+        myTurn={!setupStage && game.status === "active" && currentPlayerId === (game.my_mark === "X" ? xPlayerId : oPlayerId)}
+        opponentTurn={!setupStage && game.status === "active" && currentPlayerId === game.opponent_id}
+        startedAt={game.clock_started_at?.getTime()??null} serverNow={Date.now()}/>: <GameClocks
         gameId={id}
         myName={game.my_username}
         opponentName={game.opponent_username}
@@ -250,7 +260,7 @@ export default async function GamePage({
         opponentCanMove={!setupStage && game.status === "active" && currentPlayerId === game.opponent_id}
         myColor={game.my_mark === "X" ? "white" : "black"}
         timed={game.time_control_seconds !== null}
-      />
+      />}
       {game.game_type === "tic_tac_toe" ? (
         <>
           <p className="game-summary">{summary}</p>
