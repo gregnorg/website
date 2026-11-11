@@ -46,6 +46,16 @@ test("tournament lifecycle: brackets, rematches, server clocks, rankings, and re
     await settleTournamentClock(client, game, true);
     const remaining = Number((await client.query("SELECT time_remaining_ms FROM game_players WHERE game_id=$1 AND mark='X'", [game])).rows[0].time_remaining_ms);
     assert.ok(remaining > 409000 && remaining <= 410000);
+    // Each tournament's configured delay governs the authoritative server clock.
+    for (const [delay, expected] of [[30, 420000], [0, 400000]]) {
+        await client.query("UPDATE tournaments SET delay_seconds=$2 WHERE id=$1", [id, delay]);
+        await client.query("UPDATE game_players SET time_remaining_ms=420000 WHERE game_id=$1", [game]);
+        await client.query("UPDATE games SET clock_started_at=clock_timestamp()-interval '20 seconds' WHERE id=$1", [game]);
+        await settleTournamentClock(client, game, true);
+        const actual = Number((await client.query("SELECT time_remaining_ms FROM game_players WHERE game_id=$1 AND mark='X'", [game])).rows[0].time_remaining_ms);
+        assert.ok(actual <= expected && actual > expected - 1000);
+    }
+    await client.query("UPDATE tournaments SET delay_seconds=10 WHERE id=$1", [id]);
     await settleTournamentClock(client, game);
     // A draw makes a new game for the same two members without advancing anyone.
     await client.query("UPDATE games SET status='draw' WHERE id=$1", [game]);

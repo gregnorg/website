@@ -186,3 +186,6 @@ CREATE TABLE tournament_move_previews (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX tournament_move_previews_game_idx ON tournament_move_previews(game_id,id DESC);
+
+ALTER TABLE tournaments
+  ADD COLUMN delay_seconds INTEGER NOT NULL DEFAULT 10 CHECK (delay_seconds >= 0);

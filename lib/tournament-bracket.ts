@@ -16,7 +16,7 @@ export function seedBracket(ids: string[]): (string | null)[][] {
             pair[1] = players.shift()!;
     return pairs;
 }
-// The existing ten-second bonus is a delay before the base clock runs each turn.
-export function tournamentRemaining(base: number, startedAt: Date | null, now = Date.now()) {
-    return Math.max(0, base - (startedAt ? Math.max(0, now - startedAt.getTime() - 10000) : 0));
+// The delay resets each turn and does not add time to the base clock.
+export function tournamentRemaining(base: number, startedAt: Date | null, now = Date.now(), delaySeconds = 10) {
+    return Math.max(0, base - (startedAt ? Math.max(0, now - startedAt.getTime() - delaySeconds * 1000) : 0));
 }

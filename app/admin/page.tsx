@@ -31,8 +31,9 @@ export default async function AdminPage({ searchParams }: Props) {
       <form action={createTournament} className="tournament-form">
         <label>Tournament name <input name="name" maxLength={100} required /></label>
         <label>Minutes per player <input name="minutes" type="number" min="1" max="35791394" step="1" defaultValue="5" required /></label>
+        <label>Clock delay per turn (seconds) <input name="delaySeconds" type="number" min="0" max="2147483647" step="1" defaultValue="10" required /></label>
         <fieldset><legend>Select 4–8 members</legend><div className="tournament-members">{users.rows.map(user=><label key={user.id}><input type="checkbox" name="members" value={user.id}/>{user.username}</label>)}</div></fieldset>
-        <p>Random single elimination bracket, with byes when needed. No acceptance required. Clocks begin after both players set up, with a 10-second bonus each turn.</p>
+        <p>Random single elimination bracket, with byes when needed. No acceptance required. Clocks begin after both players set up, with your selected delay before the clock runs each turn. Set the delay to 0 for no delay.</p>
         <button className="button">Create and start tournament</button>
       </form>
       <h2>Players</h2>

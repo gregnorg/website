@@ -9,9 +9,11 @@ export async function createTournament(data: FormData) {
     const admin = await requireAdmin();
     const name = String(data.get("name") ?? "").trim();
     const minutes = Number(data.get("minutes"));
+    const delayInput = String(data.get("delaySeconds") ?? "10").trim();
+    const delaySeconds = Number(delayInput);
     const ids = data.getAll("members").map(String);
-    if (!name || name.length > 100 || !Number.isInteger(minutes) || minutes < 1 || minutes > 35791394 || ids.length < 4 || ids.length > 8 || new Set(ids).size !== ids.length)
-        redirect("/admin?error=Enter+a+name,+positive+whole+minutes,+and+4–8+members.");
+    if (!delayInput || !Number.isSafeInteger(delaySeconds) || delaySeconds < 0 || delaySeconds > 2147483647 || !name || name.length > 100 || !Number.isInteger(minutes) || minutes < 1 || minutes > 35791394 || ids.length < 4 || ids.length > 8 || new Set(ids).size !== ids.length)
+        redirect("/admin?error=Enter+a+name,+positive+whole+minutes,+a+nonnegative+whole-second+delay,+and+4–8+members.");
     const pairs = seedBracket(ids);
     const client = await pool.connect();
     try {
@@ -21,7 +23,7 @@ export async function createTournament(data: FormData) {
             throw new Error("A selected member no longer exists.");
         const t = await client.query<{
             id: string;
-        }>("INSERT INTO tournaments(name,minutes,created_by) VALUES($1,$2,$3) RETURNING id", [name, minutes, admin.id]);
+        }>("INSERT INTO tournaments(name,minutes,created_by,delay_seconds) VALUES($1,$2,$3,$4) RETURNING id", [name, minutes, admin.id, delaySeconds]);
         const id = t.rows[0].id;
         for (let round = 0, count = pairs.length; count >= 1; round++, count /= 2) {
             for (let slot = 0; slot < count; slot++)

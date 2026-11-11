@@ -81,8 +81,9 @@ export async function settleTournamentClock(client: PoolClient, gameId: string, 
     const game = (await client.query<{
         status: string;
         clock_started_at: Date | null;
+        delay_seconds: number;
         tournament_id: string | null;
-    }>("SELECT status, clock_started_at, tournament_id FROM games WHERE id=$1 FOR UPDATE", [gameId])).rows[0];
+    }>("SELECT g.status, g.clock_started_at, g.tournament_id, t.delay_seconds FROM games g LEFT JOIN tournaments t ON t.id=g.tournament_id WHERE g.id=$1 FOR UPDATE OF g", [gameId])).rows[0];
     if (!game?.tournament_id || game.status !== "active")
         return;
     const players = (await client.query<{
@@ -97,7 +98,7 @@ export async function settleTournamentClock(client: PoolClient, gameId: string, 
         return;
     const active = currentPlayerId("pushfight", x.user_id, o.user_id, summary);
     const player = players.find(p => p.user_id === active)!;
-    const remaining = tournamentRemaining(Number(player.time_remaining_ms), game.clock_started_at);
+    const remaining = tournamentRemaining(Number(player.time_remaining_ms), game.clock_started_at, Date.now(), game.delay_seconds);
     if (remaining === 0 || finishTurn) {
         await client.query("UPDATE game_players SET time_remaining_ms=$3 WHERE game_id=$1 AND user_id=$2", [gameId, active, remaining]);
         await client.query("UPDATE games SET clock_started_at=NULL WHERE id=$1", [gameId]);

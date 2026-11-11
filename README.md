@@ -258,3 +258,5 @@ Tournament clocks start only after both setups are complete. Server timestamps k
 Apply migration `022_live_tournaments.sql` with `npm run migrate` before deploying this version. No separate tournament service is needed.
 
 Tournament players also broadcast provisional setup placements, piece moves, pushes, and resets before pressing Submit. Opponents and spectators see these frames in order with a “Live preview” label. The server validates them against the committed position and active player; they never become official moves or alter clocks/results until the turn is submitted. Frames are temporary and are removed shortly after submission or when their game is deleted. Apply migration `023_tournament_move_previews.sql` before deploying this addition.
+
+Admins can set each new tournament's clock delay to any nonnegative whole number of seconds (0 disables the delay). The default is 10 seconds. The setting applies to every round and rematch and is shown on the tournament and game clocks. Existing tournaments retain the 10-second delay. Apply migration `024_tournament_clock_delay.sql` before deploying this addition.

@@ -24,3 +24,14 @@ test("server clock pauses for setup and gives ten seconds each turn without page
     assert.equal(tournamentRemaining(60000, new Date(now - 70000), now), 0);
     assert.equal(tournamentRemaining(60000, new Date(now - 500000), now), 0);
 });
+
+test("tournament clocks use the configured whole-second delay, including zero", () => {
+    const now = 100000;
+    const started = new Date(now - 20000);
+    assert.equal(tournamentRemaining(60000, started, now, 0), 40000);
+    assert.equal(tournamentRemaining(60000, started, now, 3), 43000);
+    assert.equal(tournamentRemaining(60000, started, now, 30), 60000);
+    assert.equal(tournamentRemaining(60000, new Date(now - 35000), now, 30), 55000);
+    assert.equal(tournamentRemaining(60000, null, now, 0), 60000);
+    assert.equal(tournamentRemaining(60000, new Date(now - 100000), now, 30), 0);
+});

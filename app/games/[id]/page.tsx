@@ -42,6 +42,7 @@ export default async function GamePage({
     id: string;
     tournament_id: string | null;
     clock_started_at: Date | null;
+    delay_seconds: number | null;
     game_number: string;
     my_username: string;
     status: GameStatus;
@@ -59,7 +60,7 @@ export default async function GamePage({
     my_time_remaining_ms: string | null;
     opponent_time_remaining_ms: string | null;
   }>(
-    `SELECT g.id, g.tournament_id, g.clock_started_at, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
+    `SELECT g.id, g.tournament_id, g.clock_started_at, (SELECT delay_seconds FROM tournaments WHERE id=g.tournament_id) AS delay_seconds, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
             me.mark AS my_mark, me.time_remaining_ms AS my_time_remaining_ms,
             them.time_remaining_ms AS opponent_time_remaining_ms,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
@@ -243,7 +244,7 @@ export default async function GamePage({
           {game.tournament_id ? <Link href="/tournaments">View tournament bracket →</Link> : nextTurnGameId ? <Link href={`/games/${nextTurnGameId}`}>Play your next game →</Link> : <Link href="/games">View my games</Link>}
         </div>
       )}
-      {game.tournament_id ? <TournamentClocks myColor={game.my_mark === "X" ? "white" : "black"} myName={game.my_username} opponentName={game.opponent_username}
+      {game.tournament_id ? <TournamentClocks delaySeconds={game.delay_seconds ?? 10} myColor={game.my_mark === "X" ? "white" : "black"} myName={game.my_username} opponentName={game.opponent_username}
         myRemainingMs={Number(game.my_time_remaining_ms??0)} opponentRemainingMs={Number(game.opponent_time_remaining_ms??0)}
         myTurn={!setupStage && game.status === "active" && currentPlayerId === (game.my_mark === "X" ? xPlayerId : oPlayerId)}
         opponentTurn={!setupStage && game.status === "active" && currentPlayerId === game.opponent_id}
