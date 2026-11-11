@@ -279,6 +279,8 @@ export default async function GamePage({
       ) : (
         <>
           <PushfightBoard
+            livePreviews={Boolean(game.tournament_id && game.status === "active")}
+            baseMoveCount={moves.rows.length}
             key={`${id}:${moves.rows.length}`}
             board={pushfightBoard}
             gameId={id}

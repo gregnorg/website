@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTournamentPreview } from "@/components/use-tournament-preview";
 import { GameMenu } from "@/components/game-menu";
 import type { Board, Coord, PushfightCell, MovePayload, TurnAction } from "@/lib/pushfight";
 import { applyMove, isValidCoord } from "@/lib/pushfight";
 
 type Props = {
   board: Board;
+  livePreviews?: boolean;
+  baseMoveCount?: number;
   gameId: string;
   myId: string;
   spectator?: boolean;
@@ -119,6 +122,8 @@ function rotateDirection(direction: Knockout["dir"], rotation: Rotation): Knocko
 
 export default function PushfightBoard({
   board,
+  livePreviews = false,
+  baseMoveCount = 0,
   gameId,
   myId,
   spectator = false,
@@ -135,6 +140,7 @@ export default function PushfightBoard({
   resignAction,
   drawAction,
 }: Props) {
+  const preview = useTournamentPreview(gameId, livePreviews, baseMoveCount, canMove);
   const [selectedPiece, setSelectedPiece] = useState<Coord | null>(null);
   const [setupSelection, setSetupSelection] = useState<Coord[]>([]);
   const [stagedBoard, setStagedBoard] = useState<Board>(board);
@@ -183,7 +189,7 @@ export default function PushfightBoard({
   const turnComplete = stagedActions.at(-1)?.type === "push";
   const movesRemaining = Math.max(0, 2 - movesThisTurn - stagedMoveCount);
 
-  const displayedBoard = replayBoard ?? (isSetupPhase
+  const displayedBoard = replayBoard ?? preview.board ?? (isSetupPhase
     ? board.map((row, rowIndex) => row.map((cell, colIndex) => {
         const index = setupSelection.findIndex((coord) => coordEquals(coord, { row: rowIndex, col: colIndex }));
         return index !== -1 && cell === "empty" ? buildPreviewPiece(myColor, index) : cell;
@@ -221,6 +227,7 @@ export default function PushfightBoard({
     : turnComplete ? { type: "turn", actions: stagedActions } : null;
 
   const resetTurn = () => {
+    preview.share(isSetupPhase ? {type:"setup",pieces:[]} : {type:"turn",actions:[]});
     setSelectedPiece(null);
     setSetupSelection([]);
     setStagedBoard(board);
@@ -235,11 +242,11 @@ export default function PushfightBoard({
 
     if (isSetupPhase) {
       if (!isSetupTurn || board[row][col] !== "empty") return;
-      setSetupSelection((current) => {
-        const exists = current.some((item) => coordEquals(item, coord));
-        if (exists) return current.filter((item) => !coordEquals(item, coord));
-        return current.length < 5 ? [...current, coord] : current;
-      });
+      const exists = setupSelection.some((item) => coordEquals(item, coord));
+      const next = exists ? setupSelection.filter((item) => !coordEquals(item, coord))
+        : setupSelection.length < 5 ? [...setupSelection, coord] : setupSelection;
+      setSetupSelection(next);
+      preview.share({type:"setup",pieces:next.map((piece,index)=>({...piece,kind:setupPieceKind(index)}))});
       return;
     }
 
@@ -249,7 +256,9 @@ export default function PushfightBoard({
       const eliminated = target.winner ? pushedOffPiece(stagedBoard, target.action) : null;
       knockoutId.current += 1;
       setStagedBoard(target.board);
-      setStagedActions((current) => [...current, target.action]);
+      const nextActions = [...stagedActions, target.action];
+      setStagedActions(nextActions);
+      preview.share({type:"turn",actions:nextActions});
       setKnockout(eliminated ? { ...eliminated, id: knockoutId.current } : null);
       setStagedOutcome(target.winner ? (target.winner === myColor ? "win" : "loss") : null);
       setSelectedPiece(null);
@@ -349,8 +358,10 @@ export default function PushfightBoard({
           </div>
         )}
       </div>
+      {livePreviews && preview.board && <p className="kicker" role="status">Live preview · Turn not submitted yet</p>}
+      {preview.error && <p role="status">{preview.error}</p>}
       <div className="pushfight-toolbar">
-        {!spectator && <form action={action} className="pushfight-controls">
+        {!spectator && <form action={async (data) => { await preview.flush(); await action(data); }} className="pushfight-controls">
           <input type="hidden" name="gameId" value={gameId} />
           <input type="hidden" name="action_type" value={isSetupPhase ? "setup" : turnComplete ? "turn" : ""} />
           <input type="hidden" name="action_payload" value={actionPayload ? JSON.stringify(actionPayload) : ""} />

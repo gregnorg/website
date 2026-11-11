@@ -136,6 +136,9 @@ export async function maintainTournaments() {
     }
 }
 export async function cleanupTournamentHistory(client: PoolClient) {
+    await client.query(`DELETE FROM tournament_move_previews p USING games g
+      WHERE p.game_id=g.id AND p.created_at<now()-interval '2 minutes'
+      AND (g.status<>'active' OR p.base_move_count<(SELECT count(*) FROM moves WHERE game_id=g.id))`);
     await client.query("DELETE FROM games g USING tournaments t WHERE g.tournament_id=t.id AND t.finished_at < now()-interval '24 hours'");
     await client.query("DELETE FROM tournament_matches m USING tournaments t WHERE m.tournament_id=t.id AND t.finished_at < now()-interval '24 hours'");
     await client.query("DELETE FROM tournaments WHERE finished_at < now()-interval '30 days'");
