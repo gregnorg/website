@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import { pool } from "./db.ts";
 import { createGameRecord } from "./game-repository.ts";
 import { currentPlayerId, summarizeTurns, isSetupPhase, type GameMove } from "./game-state.ts";
-import { tournamentRemaining } from "./tournament-bracket.ts";
+import { tournamentRemaining, type BracketSource } from "./tournament-bracket.ts";
 // All tournament writers lock the tournament before its games, including moves.
 export async function lockTournamentGame(client: PoolClient, gameId: string) {
     const result = await client.query<{
@@ -20,10 +20,13 @@ export async function settleTournament(client: PoolClient, id: string) {
         minutes: number;
         status: string;
         created_by: string;
+        format: string;
     }>("SELECT * FROM tournaments WHERE id = $1 FOR UPDATE", [id])).rows[0];
     if (!tournament || tournament.status !== "active")
         return;
     const matches = await client.query<{
+        sources: BracketSource[] | null;
+        reset_final: boolean;
         round: number;
         slot: number;
         player1: string | null;
@@ -36,7 +39,26 @@ export async function settleTournament(client: PoolClient, id: string) {
         if (match.resolved)
             continue;
         let { player1, player2, game_id } = match;
-        if (match.round > 0) {
+        if (match.sources) {
+            const players: (string | null)[] = [];
+            let ready = true;
+            let skipReset = false;
+            for (const source of match.sources) {
+                const feeder = (await client.query<{
+                    resolved: boolean; winner_id: string | null; player1: string | null; player2: string | null;
+                }>("SELECT resolved,winner_id,player1,player2 FROM tournament_matches WHERE tournament_id=$1 AND round=$2 AND slot=$3", [id, source.round, source.slot])).rows[0];
+                if (!feeder?.resolved) { ready = false; break; }
+                players.push(source.outcome === "winner" ? feeder.winner_id :
+                    feeder.winner_id === feeder.player1 ? feeder.player2 : feeder.player1);
+                if (match.reset_final && feeder.winner_id === feeder.player1) skipReset = true;
+            }
+            if (!ready) continue;
+            [player1, player2] = players;
+            // The undefeated finalist needs only one grand-final win.
+            if (skipReset) player2 = null;
+            await client.query("UPDATE tournament_matches SET player1=$4, player2=$5 WHERE tournament_id=$1 AND round=$2 AND slot=$3", [id, match.round, match.slot, player1, player2]);
+        }
+        else if (match.round > 0 && tournament.format !== "double") {
             const feeders = await client.query<{
                 resolved: boolean;
                 winner_id: string | null;

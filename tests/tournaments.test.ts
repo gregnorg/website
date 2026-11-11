@@ -35,3 +35,43 @@ test("tournament clocks use the configured whole-second delay, including zero", 
     assert.equal(tournamentRemaining(60000, null, now, 0), 60000);
     assert.equal(tournamentRemaining(60000, new Date(now - 100000), now, 30), 0);
 });
+
+import { doubleEliminationBracket } from "../lib/tournament-bracket.ts";
+for (let count = 4; count <= 8; count++)
+    test(`double elimination: ${count} players need two losses, including byes and final resets`, () => {
+        for (let trial = 0; trial < 100; trial++) {
+            const ids = Array.from({ length: count }, (_, i) => String(i));
+            const matches = doubleEliminationBracket(seedBracket(ids));
+            const results = new Map<string, { players: (string | null)[]; winner: string | null }>();
+            const losses = new Map(ids.map(id => [id, 0]));
+            let champion: string | null = null;
+            let games = 0;
+            for (const match of matches) {
+                let players = match.players;
+                if (match.sources) {
+                    players = match.sources.map(source => {
+                        const feeder = results.get(`${source.round}:${source.slot}`)!;
+                        assert.ok(feeder);
+                        return source.outcome === "winner" ? feeder.winner :
+                            feeder.players.find(p => p !== feeder.winner) ?? null;
+                    });
+                    const final = results.get(`${match.sources[0].round}:${match.sources[0].slot}`)!;
+                    if (match.reset && final.winner === final.players[0]) players[1] = null;
+                }
+                const active = players.filter((p): p is string => p !== null);
+                for (const player of active) assert.ok(losses.get(player)! < 2);
+                assert.equal(new Set(active).size, active.length);
+                const winner = active.length ? active[(trial + games * 7) % active.length] : null;
+                if (active.length === 2) {
+                    games++;
+                    const loser = active.find(p => p !== winner)!;
+                    losses.set(loser, losses.get(loser)! + 1);
+                }
+                results.set(`${match.round}:${match.slot}`, { players, winner });
+                champion = winner;
+            }
+            assert.ok(champion);
+            for (const id of ids) assert.equal(id === champion ? losses.get(id)! < 2 : losses.get(id) === 2, true);
+            assert.ok(games === 2 * count - 2 || games === 2 * count - 1);
+        }
+    });

@@ -1,7 +1,7 @@
 "use server";
 import { requireAdmin } from "@/lib/admin";
 import { pool } from "@/lib/db";
-import { seedBracket } from "@/lib/tournament-bracket";
+import { seedBracket, doubleEliminationBracket } from "@/lib/tournament-bracket";
 import { settleTournament } from "@/lib/tournaments";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -11,6 +11,8 @@ export async function createTournament(data: FormData) {
     const minutes = Number(data.get("minutes"));
     const delayInput = String(data.get("delaySeconds") ?? "10").trim();
     const delaySeconds = Number(delayInput);
+    const format = String(data.get("format") ?? "single");
+    if (format !== "single" && format !== "double") redirect("/admin?error=Choose+a+valid+tournament+format.");
     const ids = data.getAll("members").map(String);
     if (!delayInput || !Number.isSafeInteger(delaySeconds) || delaySeconds < 0 || delaySeconds > 2147483647 || !name || name.length > 100 || !Number.isInteger(minutes) || minutes < 1 || minutes > 35791394 || ids.length < 4 || ids.length > 8 || new Set(ids).size !== ids.length)
         redirect("/admin?error=Enter+a+name,+positive+whole+minutes,+a+nonnegative+whole-second+delay,+and+4–8+members.");
@@ -23,9 +25,13 @@ export async function createTournament(data: FormData) {
             throw new Error("A selected member no longer exists.");
         const t = await client.query<{
             id: string;
-        }>("INSERT INTO tournaments(name,minutes,created_by,delay_seconds) VALUES($1,$2,$3,$4) RETURNING id", [name, minutes, admin.id, delaySeconds]);
+        }>("INSERT INTO tournaments(name,minutes,created_by,delay_seconds,format) VALUES($1,$2,$3,$4,$5) RETURNING id", [name, minutes, admin.id, delaySeconds, format]);
         const id = t.rows[0].id;
-        for (let round = 0, count = pairs.length; count >= 1; round++, count /= 2) {
+        if (format === "double") {
+            for (const match of doubleEliminationBracket(pairs))
+                await client.query("INSERT INTO tournament_matches(tournament_id,round,slot,player1,player2,sources,bracket_label,reset_final) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", [id, match.round, match.slot, ...match.players, match.sources ? JSON.stringify(match.sources) : null, match.label, match.reset]);
+        }
+        else for (let round = 0, count = pairs.length; count >= 1; round++, count /= 2) {
             for (let slot = 0; slot < count; slot++)
                 await client.query("INSERT INTO tournament_matches(tournament_id,round,slot,player1,player2) VALUES($1,$2,$3,$4,$5)", [id, round, slot, round === 0 ? pairs[slot][0] : null, round === 0 ? pairs[slot][1] : null]);
         }
