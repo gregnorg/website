@@ -1,9 +1,10 @@
 import type { PoolClient } from "pg";
 import { applyMove, emptyBoard, isValidCoord, normalizeMovePayload, type Board } from "./pushfight.ts";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove } from "./game-state.ts";
-import { lockTournamentGame } from "./tournaments.ts";
+import { tournamentRemaining } from "./tournament-bracket.ts";
 
 export class PreviewError extends Error {}
+export class PreviewRateLimitError extends PreviewError {}
 
 // Rebuild every preview from the committed position. Clients cannot supply a board,
 // change clocks, finish a game, or advance a bracket through this path.
@@ -38,18 +39,33 @@ export function previewBoard(board: Board, value: unknown, setup: boolean, color
 }
 
 export async function saveTournamentPreview(client: PoolClient, gameId: string, userId: string, baseMoveCount: number, draft: unknown) {
-  if (!await lockTournamentGame(client, gameId)) throw new PreviewError("This is not a live tournament game.");
-  const game = (await client.query<{ status: string; x: string; o: string }>(
-    `SELECT g.status, x.user_id x, o.user_id o FROM games g
+  // Only the selected game is locked. Preview requests never settle brackets.
+  // Membership is checked in SQL before an unauthorized caller can take a lock.
+  const game = (await client.query<{
+    status: string; x: string; o: string; clock_started_at: Date | null;
+    server_now: Date; delay_seconds: number; x_remaining: string; o_remaining: string;
+  }>(
+    `SELECT g.status,g.clock_started_at,clock_timestamp() server_now,t.delay_seconds,
+     x.user_id x,o.user_id o,x.time_remaining_ms x_remaining,o.time_remaining_ms o_remaining FROM games g
+     JOIN tournaments t ON t.id=g.tournament_id AND t.status='active'
      JOIN game_players x ON x.game_id=g.id AND x.mark='X'
      JOIN game_players o ON o.game_id=g.id AND o.mark='O'
-     WHERE g.id=$1 FOR UPDATE OF g`, [gameId])).rows[0];
+     WHERE g.id=$1 AND (x.user_id=$2 OR o.user_id=$2) FOR UPDATE OF g`, [gameId, userId])).rows[0];
   if (!game || game.status !== "active" || (userId !== game.x && userId !== game.o)) throw new PreviewError("Preview is not available.");
   const moves = (await client.query<GameMove>("SELECT player_id,payload FROM moves WHERE game_id=$1 ORDER BY move_number", [gameId])).rows;
   const summary = summarizeTurns(moves);
   if (moves.length !== baseMoveCount || currentPlayerId("pushfight", game.x, game.o, summary) !== userId) throw new PreviewError("The turn has changed.");
+  if (!isSetupPhase("pushfight", summary) && tournamentRemaining(
+    Number(userId === game.x ? game.x_remaining : game.o_remaining), game.clock_started_at,
+    game.server_now.getTime(), game.delay_seconds,
+  ) === 0) throw new PreviewError("Your clock has expired.");
+  const recent = await client.query(`SELECT 1 FROM tournament_move_previews
+    WHERE game_id=$1 AND created_at>clock_timestamp()-interval '2 seconds' LIMIT 12`, [gameId]);
+  if (recent.rowCount === 12) throw new PreviewRateLimitError("Wait a moment before sharing another preview.");
   let board = emptyBoard();
   for (const move of moves) if (move.payload) board = applyMove(board, normalizeMovePayload(move.payload), move.player_id === game.x ? "white" : "black").board;
   const preview = previewBoard(board, draft, isSetupPhase("pushfight", summary), userId === game.x ? "white" : "black");
   await client.query("INSERT INTO tournament_move_previews(game_id,base_move_count,board) VALUES($1,$2,$3)", [gameId, baseMoveCount, JSON.stringify(preview)]);
+  await client.query(`DELETE FROM tournament_move_previews WHERE game_id=$1 AND id<(
+    SELECT id FROM tournament_move_previews WHERE game_id=$1 ORDER BY id DESC OFFSET 63 LIMIT 1)`, [gameId]);
 }

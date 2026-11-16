@@ -2,7 +2,8 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { isChatOriginAllowed } from "@/lib/game-chat";
-import { PreviewError, saveTournamentPreview } from "@/lib/tournament-preview";
+import { PreviewError, PreviewRateLimitError, saveTournamentPreview } from "@/lib/tournament-preview";
+import { readJsonBody, RequestBodyError } from "@/lib/request-body";
 
 export async function POST(request: Request, { params }: { params: Promise<{id: string}> }) {
   if (!isChatOriginAllowed(request)) return Response.json({error:"Invalid origin."}, {status:403});
@@ -10,11 +11,13 @@ export async function POST(request: Request, { params }: { params: Promise<{id: 
   if (!session) return Response.json({error:"Sign in to share moves."}, {status:401});
   const {id} = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return Response.json({error:"Invalid game."}, {status:400});
-  const raw = await request.text();
-  if (raw.length > 4096) return Response.json({error:"Invalid preview."}, {status:400});
-  let body;
-  try { body=JSON.parse(raw); } catch { return Response.json({error:"Invalid preview."}, {status:400}); }
-  if (!Number.isSafeInteger(body?.baseMoveCount) || body.baseMoveCount < 0) return Response.json({error:"Invalid turn."}, {status:400});
+  let body: { baseMoveCount?: unknown; draft?: unknown } | null;
+  try { body = await readJsonBody(request) as typeof body; }
+  catch (error) {
+    if (error instanceof RequestBodyError) return Response.json({error:error.message}, {status:error.status});
+    throw error;
+  }
+  if (typeof body?.baseMoveCount !== "number" || !Number.isSafeInteger(body.baseMoveCount) || body.baseMoveCount < 0) return Response.json({error:"Invalid turn."}, {status:400});
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -23,6 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{id: 
     return Response.json({ok:true});
   } catch(error) {
     await client.query("ROLLBACK");
+    if (error instanceof PreviewRateLimitError) return Response.json({error:error.message}, {status:429,headers:{"Retry-After":"2"}});
     if (error instanceof PreviewError) return Response.json({error:error.message}, {status:409});
     // Rule validation failures are malformed previews, not application failures.
     if (error instanceof Error && !("code" in error)) return Response.json({error:error.message}, {status:400});

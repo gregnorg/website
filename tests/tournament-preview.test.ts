@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { applyMove, emptyBoard, type MovePayload, type TurnAction } from "../lib/pushfight.ts";
-import { previewBoard } from "../lib/tournament-preview.ts";
+import { previewBoard, PreviewRateLimitError } from "../lib/tournament-preview.ts";
 
 const white: MovePayload={type:"setup",pieces:[
   {row:0,col:2,kind:"pusher"},{row:0,col:3,kind:"pusher"},{row:1,col:0,kind:"pusher"},
@@ -75,6 +75,14 @@ test("only the active tournament player can publish validated frames for the cur
   await assert.rejects(()=>saveTournamentPreview(client,regular,ids[0],0,partial));
   await client.query("UPDATE games SET status='cancelled' WHERE id=$1",[game]);
   await assert.rejects(()=>saveTournamentPreview(client,game,ids[0],2,{type:"turn",actions:[]}));
+  await client.query("UPDATE games SET status='active' WHERE id=$1",[game]);
+  await client.query(`INSERT INTO tournament_move_previews(game_id,base_move_count,board,created_at)
+    SELECT $1,2,'[]'::jsonb,clock_timestamp()-interval '3 minutes' FROM generate_series(1,80)`,[game]);
+  await saveTournamentPreview(client,game,ids[0],2,{type:"turn",actions:[]});
+  assert.equal((await client.query("SELECT count(*)::int n FROM tournament_move_previews WHERE game_id=$1",[game])).rows[0].n,64);
+  await client.query("UPDATE tournament_move_previews SET created_at=clock_timestamp()-interval '3 minutes' WHERE game_id=$1",[game]);
+  for(let i=0;i<12;i++)await saveTournamentPreview(client,game,ids[0],2,{type:"turn",actions:[]});
+  await assert.rejects(()=>saveTournamentPreview(client,game,ids[0],2,{type:"turn",actions:[]}),PreviewRateLimitError);
   await client.query("DELETE FROM tournaments WHERE id=$1",[tournament]);
   assert.equal((await client.query("SELECT 1 FROM tournament_move_previews WHERE game_id=$1",[game])).rowCount,0);
 });
