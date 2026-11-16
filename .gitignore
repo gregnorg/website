@@ -13,3 +13,4 @@ dump.test
 *.log
 *.tsbuildinfo
 .tools/
+output/
