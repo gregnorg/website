@@ -152,7 +152,7 @@ export async function makeMove(formData: FormData) {
         after(sendCrownAnnouncements);
         if (!winningMark && !isDraw(nextBoard)) {
           const nextPlayerId = players.rows.find((row) => row.user_id !== session.user.id)?.user_id;
-          if (nextPlayerId) await sendTurnNotification(gameId, nextPlayerId);
+          if (nextPlayerId) after(() => sendTurnNotification(gameId, nextPlayerId));
         }
       }
       revalidatePath(`/games/${gameId}`);
@@ -275,7 +275,7 @@ export async function makeMove(formData: FormData) {
             { player_id: session.user.id, payload: actionPayload },
           ]);
           const nextPlayer = currentPlayerId(game.game_type, playerX!, playerO!, nextSummary);
-          await sendTurnNotification(gameId, nextPlayer);
+          after(() => sendTurnNotification(gameId, nextPlayer));
         }
       } catch (err) {
         await client.query("ROLLBACK");

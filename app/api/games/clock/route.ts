@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       await client.query("ROLLBACK");
       return Response.json({ error: "Game not found." }, { status: 404 });
     }
-    await settleGameClock(client, gameId);
+    const timedOut = await settleGameClock(client, gameId);
     const game = (await client.query<{
       status: string; game_type: GameType; clock_started_at: Date | null; server_now: Date;
       my_remaining_ms: string; opponent_remaining_ms: string; x: string; o: string;
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       JOIN game_players o ON o.game_id=g.id AND o.mark='O' WHERE g.id=$1`, [gameId, session.user.id])).rows[0];
     const moves = (await client.query<GameMove>("SELECT player_id,payload FROM moves WHERE game_id=$1 ORDER BY move_number", [gameId])).rows;
     await client.query("COMMIT");
-    after(sendCrownAnnouncements);
+    if (timedOut) after(sendCrownAnnouncements);
     return Response.json({
       status: game.status,
       myTurn: !isSetupPhase(game.game_type, summarizeTurns(moves)) && currentPlayerId(game.game_type, game.x, game.o, summarizeTurns(moves)) === session.user.id,
