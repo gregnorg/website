@@ -24,6 +24,11 @@
     "resend": "^6.20.0",
     "web-push": "^3.6.7"
   },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.8"
+    }
+  },
   "devDependencies": {
     "@types/node": "latest",
     "@types/pg": "latest",
