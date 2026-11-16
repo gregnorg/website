@@ -1,11 +1,11 @@
 import { Pool } from "pg";
 import { checkPushHealth, sendMonitoringEmail } from "../lib/push-monitor.ts";
+import { databaseConnectionConfig } from "../lib/database-config.ts";
 
 // A separate connection and timeout allow alerting even when the application or
 // its database connections are stuck. Email uses a different provider from push.
 const monitorPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+  ...databaseConnectionConfig(),
   max: 1, connectionTimeoutMillis: 10_000, query_timeout: 10_000,
 });
 const dryRun = process.argv.includes("--dry-run");

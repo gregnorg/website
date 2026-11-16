@@ -1,12 +1,10 @@
 import { Pool } from "pg";
+import { databaseConnectionConfig } from "./database-config.ts";
 
 const globalForDb = globalThis as unknown as { pool?: Pool };
 
 export const pool = globalForDb.pool ?? new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === "true"
-    ? { rejectUnauthorized: false }
-    : undefined,
+  ...databaseConnectionConfig(),
   max: 5,
 });
 
