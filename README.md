@@ -10,10 +10,11 @@ includes game chat, spectating, move replays, rankings, and a championship crown
 For players in active timed games, the game page does not refresh automatically,
 including when returning to the tab or window. Use the browser's refresh when
 ready to see the opponent's move; there is no extra refresh button on the page.
-Opening or manually refreshing the page on your turn starts the clock after a
-10-second grace period. The clock counts time only while the page is visible
-and pauses during Push Fight setup. Leaving a visible page open on your turn
-still uses your time.
+Clocks use server timestamps, with a 10-second delay at the start of each turn,
+and pause during Push Fight setup. Once started, a clock continues while a tab
+is hidden or closed; refreshing does not reset it. The server settles expired
+clocks independently of browser requests. Existing games without a server
+timestamp begin on their next interaction.
 
 Untimed games and spectators retain automatic game-page updates. Chat and
 app-icon badge updates continue independently in timed games.
