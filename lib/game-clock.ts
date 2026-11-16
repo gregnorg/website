@@ -1,7 +1,8 @@
 import type { PoolClient } from "pg";
 import { pool } from "./db.ts";
+import { loadGameMoves } from "./game-moves.ts";
 import { transferChampionship } from "./championship.ts";
-import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type GameType } from "./game-state.ts";
+import { currentPlayerId, isSetupPhase, summarizeTurns, type GameType } from "./game-state.ts";
 import { tournamentRemaining } from "./tournament-bracket.ts";
 
 // Caller owns the transaction. Browser-reported elapsed time is never used.
@@ -14,7 +15,7 @@ export async function settleGameClock(client: PoolClient, gameId: string, finish
   if (!game || game.status !== "active" || game.time_control_seconds === null) return false;
   const players = (await client.query<{ user_id: string; mark: string; time_remaining_ms: string }>(
     "SELECT user_id,mark,time_remaining_ms FROM game_players WHERE game_id=$1", [gameId])).rows;
-  const moves = (await client.query<GameMove>("SELECT player_id,payload FROM moves WHERE game_id=$1 ORDER BY move_number", [gameId])).rows;
+  const moves = await loadGameMoves(client, gameId);
   const summary = summarizeTurns(moves);
   if (isSetupPhase(game.game_type, summary)) return false;
   const x = players.find(p => p.mark === "X")!;

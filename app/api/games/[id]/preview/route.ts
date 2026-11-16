@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { pool } from "@/lib/db";
+import { withTransaction } from "@/lib/transaction";
 import { isChatOriginAllowed } from "@/lib/game-chat";
 import { PreviewError, PreviewRateLimitError, saveTournamentPreview } from "@/lib/tournament-preview";
 import { readJsonBody, RequestBodyError } from "@/lib/request-body";
@@ -18,18 +18,15 @@ export async function POST(request: Request, { params }: { params: Promise<{id: 
     throw error;
   }
   if (typeof body?.baseMoveCount !== "number" || !Number.isSafeInteger(body.baseMoveCount) || body.baseMoveCount < 0) return Response.json({error:"Invalid turn."}, {status:400});
-  const client = await pool.connect();
+  const { baseMoveCount, draft } = body;
   try {
-    await client.query("BEGIN");
-    await saveTournamentPreview(client,id,session.user.id,body.baseMoveCount,body.draft);
-    await client.query("COMMIT");
+    await withTransaction(client => saveTournamentPreview(client,id,session.user.id,baseMoveCount,draft));
     return Response.json({ok:true});
   } catch(error) {
-    await client.query("ROLLBACK");
     if (error instanceof PreviewRateLimitError) return Response.json({error:error.message}, {status:429,headers:{"Retry-After":"2"}});
     if (error instanceof PreviewError) return Response.json({error:error.message}, {status:409});
     // Rule validation failures are malformed previews, not application failures.
     if (error instanceof Error && !("code" in error)) return Response.json({error:error.message}, {status:400});
     throw error;
-  } finally { client.release(); }
+  }
 }

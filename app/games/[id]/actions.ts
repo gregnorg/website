@@ -5,14 +5,15 @@ import { after } from "next/server";
 import { sendCrownAnnouncements } from "@/lib/crown-email";
 
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import { loadGameMoves } from "@/lib/game-moves";
 import { Board, EMPTY_BOARD, isDraw, play, winner } from "@/lib/game";
 import { applyMove, emptyBoard as pfInitialBoard, MovePayload, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
 import { getMoveGameForPlayer, resignGameForPlayer, offerDrawForPlayer, respondToDrawForPlayer } from "@/lib/game-repository";
-import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type PlayerMark } from "@/lib/game-state";
+import { currentPlayerId, isSetupPhase, summarizeTurns, type PlayerMark } from "@/lib/game-state";
 import { sendTurnNotification } from "@/lib/turn-email";
 import { transferChampionship } from "@/lib/championship";
 import { settleGameClock } from "@/lib/game-clock";
@@ -80,20 +81,12 @@ export async function makeMove(formData: FormData) {
     );
     const player = players.rows.find((row) => row.user_id === session.user.id)!;
 
-    const moves = await client.query<GameMove>(
-      `SELECT m.position, m.payload, m.player_id, gp.mark
-         FROM moves m
-         LEFT JOIN game_players gp
-           ON gp.game_id = m.game_id AND gp.user_id = m.player_id
-        WHERE m.game_id = $1
-        ORDER BY m.move_number`,
-      [gameId],
-    );
+    const moves = await loadGameMoves(client, gameId);
 
     // Handle Tic-tac-toe as before
     if (game.game_type === "tic_tac_toe") {
       const board = [...EMPTY_BOARD] as Board;
-      for (const move of moves.rows) {
+      for (const move of moves) {
         if (move.position !== null && move.mark !== null) board[move.position] = move.mark;
       }
 
@@ -122,7 +115,7 @@ export async function makeMove(formData: FormData) {
         await client.query(
           `INSERT INTO moves (game_id, player_id, position, move_number)
            VALUES ($1, $2, $3, $4)`,
-          [gameId, session.user.id, position, moves.rows.length + 1],
+          [gameId, session.user.id, position, moves.length + 1],
         );
 
         const winningMark = winner(nextBoard);
@@ -176,7 +169,7 @@ export async function makeMove(formData: FormData) {
 
     // reconstruct board from initial setup and applied payloads
     let pfBoard = pfInitialBoard();
-    for (const mv of moves.rows) {
+    for (const mv of moves) {
       if (!mv.payload) continue;
       try {
         const normalizedPayload = normalizeMovePayload(mv.payload);
@@ -188,7 +181,7 @@ export async function makeMove(formData: FormData) {
       }
     }
 
-    const turnSummary = summarizeTurns(moves.rows);
+    const turnSummary = summarizeTurns(moves);
     const setupStage = isSetupPhase(game.game_type, turnSummary);
     const expectedPlayer = currentPlayerId(game.game_type, playerX!, playerO!, turnSummary);
     if (!message && session.user.id !== expectedPlayer) message = "It is not your turn.";
@@ -223,7 +216,7 @@ export async function makeMove(formData: FormData) {
       }
     }
 
-    const movesThisTurn = movesSinceLastPush(moves.rows);
+    const movesThisTurn = movesSinceLastPush(moves);
     if (!message && actionPayload?.type === "move" && movesThisTurn >= 2) {
       message = "You can only make up to two moves before pushing.";
     }
@@ -252,7 +245,7 @@ export async function makeMove(formData: FormData) {
         await client.query(
           `INSERT INTO moves (game_id, player_id, payload, move_number)
            VALUES ($1, $2, $3, $4)`,
-          [gameId, session.user.id, actionPayload, moves.rows.length + 1],
+          [gameId, session.user.id, actionPayload, moves.length + 1],
         );
         if (result.winner) {
           const winnerId = (result.winner === "white" ? playerX : playerO)!;
@@ -271,13 +264,14 @@ export async function makeMove(formData: FormData) {
         after(sendCrownAnnouncements);
         if (!result.winner) {
           const nextSummary = summarizeTurns([
-            ...moves.rows,
+            ...moves,
             { player_id: session.user.id, payload: actionPayload },
           ]);
           const nextPlayer = currentPlayerId(game.game_type, playerX!, playerO!, nextSummary);
           after(() => sendTurnNotification(gameId, nextPlayer));
         }
       } catch (err) {
+        unstable_rethrow(err);
         await client.query("ROLLBACK");
         message = err instanceof Error ? err.message : "That action is not allowed.";
       }

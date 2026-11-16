@@ -2,8 +2,9 @@ import { after } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import { loadGameMoves } from "@/lib/game-moves";
 import { settleGameClock } from "@/lib/game-clock";
-import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove, type GameType } from "@/lib/game-state";
+import { currentPlayerId, isSetupPhase, summarizeTurns, type GameType } from "@/lib/game-state";
 import { sendCrownAnnouncements } from "@/lib/crown-email";
 import { isChatOriginAllowed } from "@/lib/game-chat";
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
       JOIN game_players them ON them.game_id=g.id AND them.user_id<>$2
       JOIN game_players x ON x.game_id=g.id AND x.mark='X'
       JOIN game_players o ON o.game_id=g.id AND o.mark='O' WHERE g.id=$1`, [gameId, session.user.id])).rows[0];
-    const moves = (await client.query<GameMove>("SELECT player_id,payload FROM moves WHERE game_id=$1 ORDER BY move_number", [gameId])).rows;
+    const moves = await loadGameMoves(client, gameId);
     await client.query("COMMIT");
     if (timedOut) after(sendCrownAnnouncements);
     return Response.json({

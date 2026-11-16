@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import { loadGameMoves } from "@/lib/game-moves";
 import { Board, EMPTY_BOARD } from "@/lib/game";
 import { makeMove, resignGame, manageDrawOffer } from "./actions";
 import PushfightBoard from "@/components/pushfight-board";
@@ -23,7 +24,7 @@ import {
 import RefreshOnReturn from "@/components/refresh-on-return";
 import { GameClocks } from "@/components/game-clocks";
 import GameChat from "@/components/game-chat";
-import { completeGameHistory, type HistoryMove } from "@/lib/game-history";
+import { completeGameHistory } from "@/lib/game-history";
 
 export const dynamic = "force-dynamic";
 
@@ -89,40 +90,32 @@ export default async function GamePage({
   const isPlayer = viewerId === game.x_player_id || viewerId === game.o_player_id;
 
   const isTicTacToe = game.game_type === "tic_tac_toe";
-  const moves = await pool.query<HistoryMove>(
-    `SELECT m.move_number, m.position, m.payload, gp.mark, m.player_id
-       FROM moves m
-       LEFT JOIN game_players gp
-         ON gp.game_id = m.game_id AND gp.user_id = m.player_id
-      WHERE m.game_id = $1
-      ORDER BY m.move_number`,
-    [id],
-  );
+  const moves = await loadGameMoves(pool, id);
 
   const board = [...EMPTY_BOARD] as Board;
   if (isTicTacToe) {
-    for (const move of moves.rows) {
+    for (const move of moves) {
       if (move.position !== null && move.mark !== null) board[move.position] = move.mark;
     }
   }
   const xPlayerId = game.x_player_id;
   const oPlayerId = game.o_player_id;
-  const turnSummary = summarizeTurns(moves.rows);
+  const turnSummary = summarizeTurns(moves);
   const setupStage = isSetupPhase(game.game_type, turnSummary);
   const currentPlayerId = getCurrentPlayerId(game.game_type, xPlayerId, oPlayerId, turnSummary);
-  const movesThisTurn = movesSinceLastPush(moves.rows);
+  const movesThisTurn = movesSinceLastPush(moves);
   const canMove = game.status === "active" && currentPlayerId === viewerId;
   const replayEnabled = !isPlayer || game.status !== "active" || currentPlayerId !== game.opponent_id;
-  const lastOpponentMoveIndex = !isPlayer ? moves.rows.length - 1 : moves.rows.findLastIndex((move) => move.player_id === game.opponent_id);
+  const lastOpponentMoveIndex = !isPlayer ? moves.length - 1 : moves.findLastIndex((move) => move.player_id === game.opponent_id);
   const ticTacToeReplayPosition = isTicTacToe && lastOpponentMoveIndex >= 0
-    ? moves.rows[lastOpponentMoveIndex].position
+    ? moves[lastOpponentMoveIndex].position
     : null;
 
   let pushfightBoard = emptyBoard();
   const pushfightReplayBoards: ReturnType<typeof emptyBoard>[] = [];
   if (!isTicTacToe) {
-    for (let index = 0; index < moves.rows.length; index += 1) {
-      const move = moves.rows[index];
+    for (let index = 0; index < moves.length; index += 1) {
+      const move = moves[index];
       if (!move.payload) continue;
       try {
         const payload = normalizeMovePayload(move.payload);
@@ -227,7 +220,7 @@ export default async function GamePage({
     externalEnding: Boolean(game.resigned_by_id || game.idle_expired ||
       (game.time_control_seconds !== null && ((game.my_time_remaining_ms !== null && Number(game.my_time_remaining_ms) === 0) ||
         (game.opponent_time_remaining_ms !== null && Number(game.opponent_time_remaining_ms) === 0)))),
-  }, moves.rows) !== null;
+  }, moves) !== null;
 
   const moveAction = makeMove;
 
@@ -286,8 +279,8 @@ export default async function GamePage({
         <>
           <PushfightBoard
             livePreviews={Boolean(game.tournament_id && game.status === "active")}
-            baseMoveCount={moves.rows.length}
-            key={`${id}:${moves.rows.length}`}
+            baseMoveCount={moves.length}
+            key={`${id}:${moves.length}`}
             board={pushfightBoard}
             gameId={id}
             spectator={!isPlayer}

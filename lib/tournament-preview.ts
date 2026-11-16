@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
+import { loadGameMoves } from "./game-moves.ts";
 import { applyMove, emptyBoard, isValidCoord, normalizeMovePayload, type Board } from "./pushfight.ts";
-import { currentPlayerId, isSetupPhase, summarizeTurns, type GameMove } from "./game-state.ts";
+import { currentPlayerId, isSetupPhase, summarizeTurns } from "./game-state.ts";
 import { tournamentRemaining } from "./tournament-bracket.ts";
 
 export class PreviewError extends Error {}
@@ -52,7 +53,7 @@ export async function saveTournamentPreview(client: PoolClient, gameId: string, 
      JOIN game_players o ON o.game_id=g.id AND o.mark='O'
      WHERE g.id=$1 AND (x.user_id=$2 OR o.user_id=$2) FOR UPDATE OF g`, [gameId, userId])).rows[0];
   if (!game || game.status !== "active" || (userId !== game.x && userId !== game.o)) throw new PreviewError("Preview is not available.");
-  const moves = (await client.query<GameMove>("SELECT player_id,payload FROM moves WHERE game_id=$1 ORDER BY move_number", [gameId])).rows;
+  const moves = await loadGameMoves(client, gameId);
   const summary = summarizeTurns(moves);
   if (moves.length !== baseMoveCount || currentPlayerId("pushfight", game.x, game.o, summary) !== userId) throw new PreviewError("The turn has changed.");
   if (!isSetupPhase("pushfight", summary) && tournamentRemaining(

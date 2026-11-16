@@ -1,7 +1,9 @@
 import type { PoolClient } from "pg";
 import { pool } from "./db.ts";
+import { loadGameMoves } from "./game-moves.ts";
+import { withTransaction } from "./transaction.ts";
 import { createGameRecord } from "./game-repository.ts";
-import { currentPlayerId, summarizeTurns, isSetupPhase, type GameMove } from "./game-state.ts";
+import { currentPlayerId, summarizeTurns, isSetupPhase } from "./game-state.ts";
 import { tournamentRemaining, type BracketSource } from "./tournament-bracket.ts";
 // All tournament writers lock the tournament before its games, including moves.
 export async function lockTournamentGame(client: PoolClient, gameId: string) {
@@ -114,7 +116,7 @@ export async function settleTournamentClock(client: PoolClient, gameId: string, 
         time_remaining_ms: string;
     }>("SELECT * FROM game_players WHERE game_id=$1", [gameId])).rows;
     const x = players.find(p => p.mark === "X")!, o = players.find(p => p.mark === "O")!;
-    const moves = (await client.query<GameMove>("SELECT player_id, payload FROM moves WHERE game_id=$1 ORDER BY move_number", [gameId])).rows;
+    const moves = await loadGameMoves(client, gameId);
     const summary = summarizeTurns(moves);
     if (isSetupPhase("pushfight", summary))
         return;
@@ -133,36 +135,23 @@ export async function settleTournamentClock(client: PoolClient, gameId: string, 
 export async function maintainTournaments() {
     const active = await pool.query<{ id: string }>("SELECT id FROM tournaments WHERE status='active' ORDER BY id");
     for (const tournament of active.rows) {
-        const client = await pool.connect();
         try {
-            await client.query("BEGIN");
-            // Skip a tournament being changed by a player or another worker.
-            // Each bracket gets its own short transaction.
-            const locked = await client.query("SELECT id FROM tournaments WHERE id=$1 AND status='active' FOR UPDATE SKIP LOCKED", [tournament.id]);
-            if (locked.rowCount) await settleTournament(client, tournament.id);
-            await client.query("COMMIT");
+            await withTransaction(async client => {
+                // Each bracket gets its own transaction; skip busy brackets.
+                const locked = await client.query("SELECT id FROM tournaments WHERE id=$1 AND status='active' FOR UPDATE SKIP LOCKED", [tournament.id]);
+                if (locked.rowCount) await settleTournament(client, tournament.id);
+            });
         } catch (error) {
-            await client.query("ROLLBACK");
             console.error("Tournament maintenance failed", { tournamentId: tournament.id, error });
-        } finally {
-            client.release();
         }
     }
 }
 
 export async function maintainTournamentHistory() {
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
+    await withTransaction(async client => {
         const lock = await client.query<{ locked: boolean }>("SELECT pg_try_advisory_xact_lock(829173) AS locked");
         if (lock.rows[0].locked) await cleanupTournamentHistory(client);
-        await client.query("COMMIT");
-    } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-    } finally {
-        client.release();
-    }
+    });
 }
 export async function cleanupTournamentHistory(client: PoolClient) {
     await client.query(`DELETE FROM tournament_move_previews p USING games g
