@@ -4,6 +4,7 @@ import { buildPushPayload } from "./push-payload.ts";
 import { currentPlayerId, summarizeTurns, type GameType, type GameMove } from "./game-state.ts";
 import { gamesWaitingForMove } from "./turn-count.ts";
 import { retryablePushStatus, pushRetryDelay } from "./push-delivery-policy.ts";
+import { isAllowedPushEndpoint } from "./push-subscription.ts";
 
 // Jobs are inserted by database triggers in the same transaction as the move.
 // Network requests happen only after those transactions have committed.
@@ -70,6 +71,10 @@ export async function deliverPendingPushes(gameId?: string) {
            AND NOT EXISTS (SELECT 1 FROM turn_notification_jobs j WHERE j.game_id=d.game_id)
          ORDER BY d.next_attempt_at LIMIT 50`, [gameId ?? null]);
       for (const delivery of due.rows) {
+        if (!isAllowedPushEndpoint(delivery.endpoint)) {
+          await client.query("UPDATE push_deliveries SET status='failed',last_error='Untrusted push endpoint' WHERE id=$1", [delivery.id]);
+          continue;
+        }
         if (!delivery.p256dh || !delivery.auth) {
           await client.query("UPDATE push_deliveries SET status='expired',last_error='Subscription unavailable' WHERE id=$1", [delivery.id]);
           continue;

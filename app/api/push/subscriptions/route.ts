@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import { isChatOriginAllowed } from "@/lib/game-chat";
+import { arePushKeysValid, isAllowedPushEndpoint } from "@/lib/push-subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,7 @@ type SubscriptionInput = {
 };
 
 export async function POST(request: Request) {
+  if (!isChatOriginAllowed(request)) return NextResponse.json({ error: "Invalid origin." }, { status: 403 });
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -24,7 +27,7 @@ export async function POST(request: Request) {
   const endpoint = typeof input.endpoint === "string" ? input.endpoint : "";
   const p256dh = typeof input.keys?.p256dh === "string" ? input.keys.p256dh : "";
   const authKey = typeof input.keys?.auth === "string" ? input.keys.auth : "";
-  if (!endpoint.startsWith("https://") || !p256dh || !authKey || endpoint.length > 2048) {
+  if (!isAllowedPushEndpoint(endpoint) || !arePushKeysValid(p256dh, authKey)) {
     return NextResponse.json({ error: "Invalid subscription." }, { status: 400 });
   }
 
@@ -48,6 +51,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!isChatOriginAllowed(request)) return NextResponse.json({ error: "Invalid origin." }, { status: 403 });
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const input = await request.json().catch(() => ({})) as { endpoint?: unknown };

@@ -8,7 +8,7 @@ test("worker records acceptance, retries transient errors, and removes revoked e
   const updates: unknown[][] = [];
   const deletions: unknown[][] = [];
   const deliveries = [201, 503, 410, 403].map((status, i) => ({
-    id: String(i), endpoint: `https://example.test/${status}`, payload: {}, attempts: 0, p256dh: "key", auth: "auth",
+    id: String(i), endpoint: `https://fcm.googleapis.com/fcm/send/${status}`, payload: {}, attempts: 0, p256dh: "key", auth: "auth",
   }));
   const originalPublic = process.env.VAPID_PUBLIC_KEY;
   const originalPrivate = process.env.VAPID_PRIVATE_KEY;
@@ -40,5 +40,29 @@ test("worker records acceptance, retries transient errors, and removes revoked e
   assert.equal(updates[1][4], 30);
   assert.deepEqual(updates[2].slice(0, 3), ["2", "expired", 410]);
   assert.deepEqual(updates[3].slice(0, 3), ["3", "failed", 403]);
-  assert.deepEqual(deletions, [["https://example.test/410"]]);
+  assert.deepEqual(deletions, [["https://fcm.googleapis.com/fcm/send/410"]]);
+});
+
+test("worker rejects previously stored untrusted endpoints before making a request", async t => {
+  const updates: unknown[][] = [];
+  t.mock.method(webpush, "setVapidDetails", () => undefined);
+  const send = t.mock.method(webpush, "sendNotification", async () => { throw new Error("must not send"); });
+  const previous = [process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY];
+  process.env.VAPID_PUBLIC_KEY = process.env.VAPID_PRIVATE_KEY = "test";
+  t.after(() => {
+    for (const [i, key] of ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"].entries()) {
+      if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i];
+    }
+  });
+  t.mock.method(pool, "connect", async () => ({
+    query: async (sql: string, values: unknown[] = []) => {
+      if (sql.includes("pg_try_advisory_lock")) return { rows: [{ locked: true }] };
+      if (sql.includes("SELECT d.id")) return { rows: [{ id: "blocked", endpoint: "https://127.0.0.1/private", p256dh: "key", auth: "auth" }] };
+      if (sql.startsWith("UPDATE push_deliveries")) updates.push(values);
+      return { rows: [] };
+    }, release() {},
+  }));
+  await deliverPendingPushes();
+  assert.equal(send.mock.callCount(), 0);
+  assert.deepEqual(updates, [["blocked"]]);
 });
