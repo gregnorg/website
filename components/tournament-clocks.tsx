@@ -13,7 +13,11 @@ export function TournamentClocks({ myName, opponentName, myRemainingMs, opponent
     serverNow: number;
 }) {
     const [elapsed, setElapsed] = useState(0);
-    useEffect(() => { const origin = Date.now(); setElapsed(0); const timer = setInterval(() => setElapsed(Date.now() - origin), 100); return () => clearInterval(timer); }, [serverNow]);
+    useEffect(() => {
+        const origin = Date.now();
+        const timer = setInterval(() => setElapsed(Date.now() - origin), 100);
+        return () => clearInterval(timer);
+    }, [serverNow]);
     const delayMs = delaySeconds * 1000;
     const age = startedAt === null ? 0 : Math.max(0, serverNow + elapsed - startedAt);
     const format = (base: number, active: boolean) => { const total = Math.ceil(Math.max(0, base - (active ? Math.max(0, age - delayMs) : 0)) / 1000); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`; };

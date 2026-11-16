@@ -48,7 +48,7 @@ test("only the active tournament player can publish validated frames for the cur
   await client.query("BEGIN");
   t.after(async()=>{await client.query("ROLLBACK");client.release();await pool.end();});
   const ids=Array.from({length:3},()=>randomUUID());
-  for(const id of ids)await client.query('INSERT INTO "user"(id,username) VALUES($1,$1)',[id]);
+  for(const id of ids)await client.query('INSERT INTO "user"(id,name,email,username,"emailVerified") VALUES($1,$1,$1,$1,false)',[id]);
   const tournament=(await client.query("INSERT INTO tournaments(name,minutes,created_by) VALUES('Preview test',5,$1) RETURNING id",[ids[0]])).rows[0].id;
   const game=await createGameRecord(client,ids[0],ids[1],"pushfight","X",300,tournament);
   const partial={type:"setup",pieces:[{row:0,col:2,kind:"pusher"}]};
