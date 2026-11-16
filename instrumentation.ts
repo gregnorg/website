@@ -2,6 +2,7 @@ export async function register() {
     if (process.env.NEXT_RUNTIME !== "nodejs" || process.env.NEXT_PHASE === "phase-production-build")
         return;
     const { maintainTournaments } = await import("./lib/tournaments");
+    const { maintainGameClocks } = await import("./lib/game-clock");
     let busy = false;
     const tick = async () => {
         if (busy)
@@ -9,6 +10,7 @@ export async function register() {
         busy = true;
         try {
             await maintainTournaments();
+            await maintainGameClocks();
         }
         catch (error) {
             console.error("Tournament maintenance failed", error);

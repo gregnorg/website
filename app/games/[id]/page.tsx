@@ -251,6 +251,10 @@ export default async function GamePage({
         opponentTurn={!setupStage && game.status === "active" && currentPlayerId === game.opponent_id}
         startedAt={game.clock_started_at?.getTime()??null} serverNow={game.server_now.getTime()}/>: <GameClocks
         gameId={id}
+        key={`${id}:${game.server_now.getTime()}`}
+        startedAt={game.clock_started_at?.getTime() ?? null}
+        serverNow={game.server_now.getTime()}
+        canUpdate={isPlayer && game.status === "active"}
         myName={game.my_username}
         opponentName={game.opponent_username}
         myIsChampion={championResult.rows[0]?.user_id === (game.my_mark === "X" ? xPlayerId : oPlayerId)}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChampionCrown } from "@/components/champion-crown";
+import { TournamentClocks } from "@/components/tournament-clocks";
 
 type Props = {
   gameId: string;
@@ -17,105 +18,51 @@ type Props = {
   myColor: "white" | "black";
   timed: boolean;
   myTurn?: boolean;
+  startedAt: number | null;
+  serverNow: number;
+  canUpdate: boolean;
 };
 
-function formatClock(milliseconds: number) {
-  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-export function GameClocks({ gameId, myName, opponentName, myIsChampion, opponentIsChampion, myRemainingMs, opponentRemainingMs, canMove, opponentCanMove, myColor, timed, myTurn = canMove }: Props) {
+export function GameClocks(props: Props) {
   const router = useRouter();
-  const [remainingMs, setRemainingMs] = useState(myRemainingMs);
-  const [graceMs, setGraceMs] = useState(10_000);
-  const remainingRef = useRef(myRemainingMs);
-  const graceRef = useRef(10_000);
-  const pendingRef = useRef(0);
-  const requestInFlight = useRef(false);
-  const lastTick = useRef<number | null>(null);
-
+  const [snapshot, setSnapshot] = useState({
+    myRemainingMs: props.myRemainingMs, opponentRemainingMs: props.opponentRemainingMs,
+    startedAt: props.startedAt, serverNow: props.serverNow,
+  });
+  const { gameId, canUpdate, timed, myTurn = props.canMove } = props;
   useEffect(() => {
-    remainingRef.current = remainingMs;
-  }, [remainingMs]);
-
-  useEffect(() => {
-    if (!timed || !canMove || remainingRef.current <= 0) return;
-    lastTick.current = Date.now();
-
-    const flushElapsed = async () => {
-      if (requestInFlight.current || pendingRef.current < 1) return;
-      const elapsedMs = Math.min(15_000, Math.round(pendingRef.current));
-      pendingRef.current -= elapsedMs;
-      requestInFlight.current = true;
+    if (!canUpdate || !timed) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const controller = new AbortController();
+    const refresh = async () => {
       try {
         const response = await fetch("/api/games/clock", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ gameId, elapsedMs }),
-          keepalive: true,
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ gameId }), signal: controller.signal,
         });
-        if (!response.ok) {
-          if (response.status === 409) router.refresh();
-          else pendingRef.current += elapsedMs;
-          return;
-        }
-        const result = await response.json() as { remainingMs: number; timedOut: boolean };
-        const adjustedRemaining = Math.max(0, result.remainingMs - pendingRef.current);
-        remainingRef.current = adjustedRemaining;
-        setRemainingMs(adjustedRemaining);
-        if (result.timedOut) router.refresh();
-      } finally {
-        requestInFlight.current = false;
-      }
+        if (!response.ok || stopped) return;
+        const next = await response.json();
+        if (stopped) return;
+        if (next.status !== "active" || next.myTurn !== myTurn) router.refresh();
+        setSnapshot(next);
+      } catch { /* Keep displaying the last server clock until the next check. */ }
+      finally { if (!stopped) timer = setTimeout(refresh, 2000); }
     };
+    timer = setTimeout(refresh, 0);
+    return () => { stopped = true; clearTimeout(timer); controller.abort(); };
+  }, [canUpdate, timed, gameId, myTurn, router]);
 
-    const onVisibilityChange = () => {
-      lastTick.current = Date.now();
-      if (document.visibilityState !== "visible") void flushElapsed();
-    };
-    const timer = window.setInterval(() => {
-      const now = Date.now();
-      const elapsed = now - (lastTick.current ?? now);
-      lastTick.current = now;
-      if (document.visibilityState !== "visible") return;
-
-      let clockElapsed = elapsed;
-      if (graceRef.current > 0) {
-        const graceElapsed = Math.min(graceRef.current, clockElapsed);
-        graceRef.current -= graceElapsed;
-        clockElapsed -= graceElapsed;
-        setGraceMs(graceRef.current);
-      }
-      if (clockElapsed > 0) {
-        const deducted = Math.min(remainingRef.current, clockElapsed);
-        remainingRef.current -= deducted;
-        pendingRef.current += deducted;
-        setRemainingMs(remainingRef.current);
-      }
-      if (pendingRef.current >= 1_000 || remainingRef.current === 0) void flushElapsed();
-    }, 250);
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      void flushElapsed();
-    };
-  }, [canMove, gameId, router, timed]);
-
-  return (
-    <div className="game-clocks" aria-label="Game clocks">
-      <div className={`clock-${myColor}${myTurn ? " active" : ""}`}>
-        <span>{myIsChampion && <ChampionCrown />}{myName}</span>
-        <strong>{timed ? formatClock(canMove ? remainingMs : myRemainingMs) : ""}</strong>
-        {timed && canMove && graceMs > 0 && <small>Starts in {Math.ceil(graceMs / 1000)}s</small>}
-      </div>
-      <div className={`clock-${myColor === "white" ? "black" : "white"}${opponentCanMove ? " active" : ""}`}>
-        <span>{opponentIsChampion && <ChampionCrown />}{opponentName}</span>
-        <strong>{timed ? formatClock(opponentRemainingMs) : ""}</strong>
-      </div>
-    </div>
-  );
+  if (timed) return <TournamentClocks key={snapshot.serverNow} {...snapshot}
+    myName={props.myName} opponentName={props.opponentName} myColor={props.myColor}
+    myTurn={myTurn} opponentTurn={props.opponentCanMove} delaySeconds={10}
+    myIsChampion={props.myIsChampion} opponentIsChampion={props.opponentIsChampion}
+    label="Game clocks" />;
+  return <div className="game-clocks" aria-label="Game clocks">
+    {[{ name: props.myName, champion: props.myIsChampion, color: props.myColor, active: myTurn },
+      { name: props.opponentName, champion: props.opponentIsChampion, color: props.myColor === "white" ? "black" : "white", active: props.opponentCanMove }].map((p, i) =>
+      <div key={i} className={`clock-${p.color}${p.active ? " active" : ""}`}>
+        <span>{p.champion && <ChampionCrown />}{p.name}</span><strong />
+      </div>)}
+  </div>;
 }
