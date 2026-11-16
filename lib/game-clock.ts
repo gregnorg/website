@@ -46,8 +46,10 @@ export async function maintainGameClocks() {
     const due = await client.query<{ id: string }>(`SELECT id FROM games
       WHERE status='active' AND tournament_id IS NULL AND clock_expires_at<=clock_timestamp()
       ORDER BY clock_expires_at LIMIT 50 FOR UPDATE SKIP LOCKED`);
-    for (const game of due.rows) await settleGameClock(client, game.id);
+    let expired = 0;
+    for (const game of due.rows) if (await settleGameClock(client, game.id)) expired++;
     await client.query("COMMIT");
+    return expired;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

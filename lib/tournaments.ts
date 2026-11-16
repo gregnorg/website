@@ -131,30 +131,36 @@ export async function settleTournamentClock(client: PoolClient, gameId: string, 
         await client.query("UPDATE games SET clock_started_at=clock_timestamp() WHERE id=$1", [gameId]);
 }
 export async function maintainTournaments() {
+    const active = await pool.query<{ id: string }>("SELECT id FROM tournaments WHERE status='active' ORDER BY id");
+    for (const tournament of active.rows) {
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+            // Skip a tournament being changed by a player or another worker.
+            // Each bracket gets its own short transaction.
+            const locked = await client.query("SELECT id FROM tournaments WHERE id=$1 AND status='active' FOR UPDATE SKIP LOCKED", [tournament.id]);
+            if (locked.rowCount) await settleTournament(client, tournament.id);
+            await client.query("COMMIT");
+        } catch (error) {
+            await client.query("ROLLBACK");
+            console.error("Tournament maintenance failed", { tournamentId: tournament.id, error });
+        } finally {
+            client.release();
+        }
+    }
+}
+
+export async function maintainTournamentHistory() {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
-        // A transaction advisory lock allows multiple server processes without duplicate work.
-        const lock = await client.query<{
-            locked: boolean;
-        }>("SELECT pg_try_advisory_xact_lock(829173) AS locked");
-        if (!lock.rows[0].locked) {
-            await client.query("ROLLBACK");
-            return;
-        }
-        const active = await client.query<{
-            id: string;
-        }>("SELECT id FROM tournaments WHERE status='active' ORDER BY id FOR UPDATE");
-        for (const t of active.rows)
-            await settleTournament(client, t.id);
-        await cleanupTournamentHistory(client);
+        const lock = await client.query<{ locked: boolean }>("SELECT pg_try_advisory_xact_lock(829173) AS locked");
+        if (lock.rows[0].locked) await cleanupTournamentHistory(client);
         await client.query("COMMIT");
-    }
-    catch (error) {
+    } catch (error) {
         await client.query("ROLLBACK");
         throw error;
-    }
-    finally {
+    } finally {
         client.release();
     }
 }
