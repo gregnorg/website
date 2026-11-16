@@ -1,11 +1,18 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Board, MovePayload } from "@/lib/pushfight";
+import { flushPreviewQueue } from "@/lib/preview-queue";
 
 type Frame = {id: string; game_id: string; base_move_count: number; board: Board};
 
 export function useTournamentPreview(gameId: string, enabled: boolean, baseMoveCount: number, canMove: boolean) {
   const outgoing = useRef<Promise<void>>(Promise.resolve());
+  const transport = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    transport.current = controller;
+    return () => controller.abort();
+  }, [gameId, baseMoveCount, enabled, canMove]);
   const [incoming, setIncoming] = useState<Frame | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -32,26 +39,29 @@ export function useTournamentPreview(gameId: string, enabled: boolean, baseMoveC
 
   const share = useCallback((draft: MovePayload) => {
     if (!enabled || !canMove) return;
+    const controller = transport.current;
     // Serialize snapshots rather than coalescing them: even a fast move + push
     // reaches viewers in the order the player performed it.
     outgoing.current = outgoing.current.then(async () => {
       for (let attempt=0;attempt<2;attempt++) {
+        if (!controller || controller.signal.aborted) return;
         try {
           const response = await fetch(`/api/games/${gameId}/preview`, {
             method:"POST", headers:{"content-type":"application/json"},
-            body:JSON.stringify({baseMoveCount,draft}), keepalive:true, signal:AbortSignal.timeout(5000),
+            body:JSON.stringify({baseMoveCount,draft}), keepalive:true,
+            signal:AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]),
           });
           if (response.ok) {setError("");return;}
           if (response.status < 500) break;
         } catch { /* Retry a transient network failure once. */ }
       }
-      setError("Live preview could not be shared. You can still submit your turn.");
+      if (!controller?.signal.aborted) setError("Live preview could not be shared. You can still submit your turn.");
     });
   }, [gameId, enabled, baseMoveCount, canMove]);
 
   return {
     board: enabled && !canMove && incoming?.base_move_count === baseMoveCount ? incoming.board : null,
     share, error,
-    flush: () => outgoing.current,
+    flush: () => flushPreviewQueue(outgoing.current),
   };
 }
