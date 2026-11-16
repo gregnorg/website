@@ -49,6 +49,14 @@ script leaves those values blank unless supplied.
 
 ## Local setup
 
+`npm test` uses a disposable local PostgreSQL instance whenever `DATABASE_URL`
+is configured. It copies schema definitions and applied migration names, applies
+pending migrations in isolation, and removes the instance after the tests. It
+does not copy production records or run test writes against production. Install
+the PostgreSQL server tools locally; set `TEST_POSTGRES_BIN` if they are outside
+`/usr/lib/postgresql/<version>/bin`. Without `DATABASE_URL`, database tests skip.
+Each test file has a 30-second timeout so lock failures cannot stall a release.
+
 For development on Linux Mint or Ubuntu, run Node.js and PostgreSQL locally.
 On Windows, run both inside WSL. Production currently runs on Linux Mint with
 systemd and a Cloudflare Tunnel.

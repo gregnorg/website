@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint .",
-    "test": "node --env-file-if-exists=.env.local --test tests/*.test.ts",
+    "test": "node --env-file-if-exists=.env.local scripts/run-tests.mjs",
     "migrate": "node scripts/apply-migration.js",
     "games:analysis:resume": "node --env-file-if-exists=.env.local scripts/resume-replay-analysis.ts",
     "games:analyze": "node --env-file-if-exists=.env.local scripts/process-replay-analysis.ts",
