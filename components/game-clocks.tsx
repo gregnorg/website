@@ -29,9 +29,11 @@ export function GameClocks(props: Props) {
     myRemainingMs: props.myRemainingMs, opponentRemainingMs: props.opponentRemainingMs,
     startedAt: props.startedAt, serverNow: props.serverNow,
   });
-  const { gameId, canUpdate, timed, myTurn = props.canMove } = props;
+  const { gameId, canUpdate, canMove, timed, myTurn = canMove } = props;
   useEffect(() => {
-    if (!canUpdate || !timed) return;
+    // Waiting players retain manual board refreshes. The server still expires
+    // both clocks independently, so a browser heartbeat is never authoritative.
+    if (!canUpdate || !canMove || !timed) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
@@ -51,7 +53,7 @@ export function GameClocks(props: Props) {
     };
     timer = setTimeout(refresh, 0);
     return () => { stopped = true; clearTimeout(timer); controller.abort(); };
-  }, [canUpdate, timed, gameId, myTurn, router]);
+  }, [canUpdate, canMove, timed, gameId, myTurn, router]);
 
   if (timed) return <TournamentClocks key={snapshot.serverNow} {...snapshot}
     myName={props.myName} opponentName={props.opponentName} myColor={props.myColor}
