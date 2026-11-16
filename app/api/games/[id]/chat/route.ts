@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { isChatOriginAllowed, saveChatMessage, validateChatMessage } from "@/lib/game-chat";
+import { readJsonObject, RequestBodyError } from "@/lib/request-body";
 
 type Context = { params: Promise<{ id: string }> };
 const privateHeaders = { "Cache-Control": "private, no-store" };
@@ -40,9 +41,10 @@ export async function POST(request: Request, context: Context) {
   if (!session) return reply({ error: "Sign in to post in chat." }, 401);
   let body: string | null;
   try {
-    body = validateChatMessage((await request.json())?.body);
-  } catch {
-    return reply({ error: "Invalid request." }, 400);
+    body = validateChatMessage((await readJsonObject(request)).body);
+  } catch (error) {
+    if (error instanceof RequestBodyError) return reply({ error: error.message }, error.status);
+    throw error;
   }
   if (!body) return reply({ error: "Enter a message of up to 1,000 characters." }, 400);
   const gameId = await findGame((await context.params).id);

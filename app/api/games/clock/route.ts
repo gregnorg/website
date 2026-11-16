@@ -7,13 +7,19 @@ import { settleGameClock } from "@/lib/game-clock";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameType } from "@/lib/game-state";
 import { sendCrownAnnouncements } from "@/lib/crown-email";
 import { isChatOriginAllowed } from "@/lib/game-chat";
+import { readJsonObject, RequestBodyError } from "@/lib/request-body";
 
 export async function POST(request: Request) {
   if (!isChatOriginAllowed(request)) return Response.json({ error: "Invalid origin." }, { status: 403 });
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await request.json().catch(() => null);
-  const gameId = body?.gameId;
+  let body: Record<string, unknown>;
+  try { body = await readJsonObject(request); }
+  catch (error) {
+    if (error instanceof RequestBodyError) return Response.json({ error: error.message }, { status: error.status });
+    throw error;
+  }
+  const gameId = body.gameId;
   if (typeof gameId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(gameId)) {
     return Response.json({ error: "Invalid game." }, { status: 400 });
   }

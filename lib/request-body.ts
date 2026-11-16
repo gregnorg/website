@@ -28,3 +28,9 @@ export async function readJsonBody(request: Request, maxBytes = 4096): Promise<u
   try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
   catch { throw new RequestBodyError("Invalid JSON.", 400); }
 }
+
+export async function readJsonObject(request: Request, maxBytes = 4096): Promise<Record<string, unknown>> {
+  const value = await readJsonBody(request, maxBytes);
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new RequestBodyError("Expected a JSON object.", 400);
+  return value as Record<string, unknown>;
+}

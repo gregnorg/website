@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { withTransaction } from "@/lib/transaction";
 import { isChatOriginAllowed } from "@/lib/game-chat";
 import { PreviewError, PreviewRateLimitError, saveTournamentPreview } from "@/lib/tournament-preview";
-import { readJsonBody, RequestBodyError } from "@/lib/request-body";
+import { readJsonObject, RequestBodyError } from "@/lib/request-body";
 
 export async function POST(request: Request, { params }: { params: Promise<{id: string}> }) {
   if (!isChatOriginAllowed(request)) return Response.json({error:"Invalid origin."}, {status:403});
@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{id: 
   const {id} = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return Response.json({error:"Invalid game."}, {status:400});
   let body: { baseMoveCount?: unknown; draft?: unknown } | null;
-  try { body = await readJsonBody(request) as typeof body; }
+  try { body = await readJsonObject(request); }
   catch (error) {
     if (error instanceof RequestBodyError) return Response.json({error:error.message}, {status:error.status});
     throw error;

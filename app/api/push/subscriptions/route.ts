@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { isChatOriginAllowed } from "@/lib/game-chat";
 import { arePushKeysValid, isAllowedPushEndpoint } from "@/lib/push-subscription";
+import { readJsonObject, RequestBodyError } from "@/lib/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,10 @@ export async function POST(request: Request) {
 
   let input: SubscriptionInput;
   try {
-    input = await request.json() as SubscriptionInput;
-  } catch {
-    return NextResponse.json({ error: "Invalid subscription." }, { status: 400 });
+    input = await readJsonObject(request) as SubscriptionInput;
+  } catch (error) {
+    if (error instanceof RequestBodyError) return NextResponse.json({ error: error.message }, { status: error.status });
+    throw error;
   }
 
   const endpoint = typeof input.endpoint === "string" ? input.endpoint : "";
@@ -54,7 +56,12 @@ export async function DELETE(request: Request) {
   if (!isChatOriginAllowed(request)) return NextResponse.json({ error: "Invalid origin." }, { status: 403 });
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const input = await request.json().catch(() => ({})) as { endpoint?: unknown };
+  let input: Record<string, unknown>;
+  try { input = await readJsonObject(request); }
+  catch (error) {
+    if (error instanceof RequestBodyError) return NextResponse.json({ error: error.message }, { status: error.status });
+    throw error;
+  }
   const endpoint = typeof input.endpoint === "string" ? input.endpoint : "";
   if (!endpoint) return NextResponse.json({ error: "Invalid subscription." }, { status: 400 });
   await pool.query("DELETE FROM push_subscriptions WHERE endpoint = $1 AND user_id = $2", [endpoint, session.user.id]);

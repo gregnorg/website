@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readJsonBody, RequestBodyError } from "../lib/request-body.ts";
+import { readJsonBody, readJsonObject, RequestBodyError } from "../lib/request-body.ts";
 
 test("JSON bodies are limited while streaming even without a content length", async () => {
   let canceled = false;
@@ -18,4 +18,13 @@ test("bounded JSON parsing accepts valid input and rejects malformed UTF-8 and J
   assert.deepEqual(await readJsonBody(request('{"ok":true}')), { ok: true });
   await assert.rejects(() => readJsonBody(request("{")), RequestBodyError);
   await assert.rejects(() => readJsonBody(request(new Uint8Array([0xff]))), RequestBodyError);
+});
+
+test("API object parsing rejects null, arrays, and primitives without type errors", async () => {
+  const request = (body: string) => new Request("https://example.test", { method: "POST", body });
+  for (const body of ["null", "[]", '"text"', "42", "true"]) {
+    await assert.rejects(() => readJsonObject(request(body)), (e: unknown) => e instanceof RequestBodyError && e.status === 400);
+  }
+  assert.deepEqual(await readJsonObject(request('{"gameId":"game"}')), { gameId: "game" });
+  await assert.rejects(() => readJsonObject(request('{"body":"oversized"}'), 8), (e: unknown) => e instanceof RequestBodyError && e.status === 413);
 });
