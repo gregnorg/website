@@ -43,6 +43,7 @@ export default async function GamePage({
     id: string;
     tournament_id: string | null;
     clock_started_at: Date | null;
+    clock_delay_remaining_ms: number;
     server_now: Date;
     delay_seconds: number | null;
     game_number: string;
@@ -62,7 +63,7 @@ export default async function GamePage({
     my_time_remaining_ms: string | null;
     opponent_time_remaining_ms: string | null;
   }>(
-    `SELECT g.id, g.tournament_id, g.clock_started_at, clock_timestamp() AS server_now, (SELECT delay_seconds FROM tournaments WHERE id=g.tournament_id) AS delay_seconds, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
+    `SELECT g.id, g.tournament_id, g.clock_started_at, g.clock_delay_remaining_ms, clock_timestamp() AS server_now, (SELECT delay_seconds FROM tournaments WHERE id=g.tournament_id) AS delay_seconds, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
             me.mark AS my_mark, me.time_remaining_ms AS my_time_remaining_ms,
             them.time_remaining_ms AS opponent_time_remaining_ms,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
@@ -245,8 +246,8 @@ export default async function GamePage({
         startedAt={game.clock_started_at?.getTime()??null} serverNow={game.server_now.getTime()}/>: <GameClocks
         gameId={id}
         key={`${id}:${game.server_now.getTime()}`}
-        startedAt={game.clock_started_at?.getTime() ?? null}
-        serverNow={game.server_now.getTime()}
+        moveCount={moves.length}
+        delayRemainingMs={game.clock_delay_remaining_ms}
         canUpdate={isPlayer && game.status === "active"}
         myName={game.my_username}
         opponentName={game.opponent_username}

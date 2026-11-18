@@ -1,8 +1,6 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs" && process.env.NEXT_PHASE !== "phase-production-build") {
     const { maintainTournaments, maintainTournamentHistory } = await import("./lib/tournaments");
-    const { maintainGameClocks } = await import("./lib/game-clock");
-    const { sendCrownAnnouncements } = await import("./lib/crown-email");
 
     function schedule(name: string, job: () => Promise<unknown>, intervalMs: number) {
       let busy = false;
@@ -17,9 +15,6 @@ export async function register() {
       timer.unref();
     }
     schedule("Tournament maintenance", maintainTournaments, 1000);
-    schedule("Game clock maintenance", async () => {
-      if (await maintainGameClocks()) await sendCrownAnnouncements();
-    }, 1000);
     schedule("Tournament retention", maintainTournamentHistory, 60000);
   }
 }

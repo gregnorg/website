@@ -2,7 +2,6 @@ import type { PoolClient } from "pg";
 import { randomInt } from "node:crypto";
 import type { GameStatus, GameType, PlayerMark } from "./game-state.ts";
 import { transferChampionship } from "./championship.ts";
-import { settleGameClock } from "./game-clock.ts";
 
 export type MoveGame = {
   status: GameStatus;
@@ -50,7 +49,6 @@ export async function createGameRecord(
     [gameId, creatorId, creatorMark, opponentId, opponentMark,
       timeControlSeconds === null ? null : timeControlSeconds * 1000],
   );
-  if (!tournamentId && timeControlSeconds !== null) await settleGameClock(client, gameId);
   return gameId;
 }
 

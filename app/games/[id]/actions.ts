@@ -16,7 +16,7 @@ import { getMoveGameForPlayer, resignGameForPlayer, offerDrawForPlayer, respondT
 import { currentPlayerId, isSetupPhase, summarizeTurns, type PlayerMark } from "@/lib/game-state";
 import { sendTurnNotification } from "@/lib/turn-email";
 import { transferChampionship } from "@/lib/championship";
-import { settleGameClock } from "@/lib/game-clock";
+import { resetGameClockDelay } from "@/lib/game-clock";
 
 export async function resignGame(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -29,7 +29,6 @@ export async function resignGame(formData: FormData) {
   try {
     await client.query("BEGIN");
     const tournamentId = await lockTournamentGame(client, gameId);
-    await settleGameClock(client, gameId);
     await resignGameForPlayer(client, gameId, session.user.id);
     if (tournamentId) await settleTournament(client, tournamentId);
     await client.query("COMMIT");
@@ -65,11 +64,6 @@ export async function makeMove(formData: FormData) {
       await client.query("ROLLBACK");
       revalidatePath("/games");
       redirect(`/games?error=${encodeURIComponent("That game does not exist or you are not a player in it.")}`);
-    }
-    if (await settleGameClock(client, gameId)) {
-      await client.query("COMMIT");
-      after(sendCrownAnnouncements);
-      redirect(`/games/${gameId}?error=Your+clock+has+expired.`);
     }
     if (game.status !== "active") {
       message = "This game is already finished.";
@@ -107,11 +101,6 @@ export async function makeMove(formData: FormData) {
       if (message || !player || !nextBoard) {
         await client.query("ROLLBACK");
       } else {
-        if (await settleGameClock(client, gameId, true)) {
-          await client.query("COMMIT");
-          after(sendCrownAnnouncements);
-          redirect(`/games/${gameId}?error=Your+clock+has+expired.`);
-        }
         await client.query(
           `INSERT INTO moves (game_id, player_id, position, move_number)
            VALUES ($1, $2, $3, $4)`,
@@ -140,7 +129,7 @@ export async function makeMove(formData: FormData) {
           );
         }
         if (tournamentId) await settleTournament(client, tournamentId);
-        else await settleGameClock(client, gameId);
+        else await resetGameClockDelay(client, gameId);
         await client.query("COMMIT");
         after(sendCrownAnnouncements);
         if (!winningMark && !isDraw(nextBoard)) {
@@ -237,11 +226,6 @@ export async function makeMove(formData: FormData) {
           const clockState = await client.query("SELECT status FROM games WHERE id=$1", [gameId]);
           if (clockState.rows[0].status !== "active") throw new Error("Your clock has expired.");
         }
-        else if (await settleGameClock(client, gameId, true)) {
-          await client.query("COMMIT");
-          after(sendCrownAnnouncements);
-          redirect(`/games/${gameId}?error=Your+clock+has+expired.`);
-        }
         await client.query(
           `INSERT INTO moves (game_id, player_id, payload, move_number)
            VALUES ($1, $2, $3, $4)`,
@@ -259,7 +243,7 @@ export async function makeMove(formData: FormData) {
           await client.query("UPDATE games SET updated_at = now() WHERE id = $1", [gameId]);
         }
         if (tournamentId) await settleTournament(client, tournamentId);
-        else await settleGameClock(client, gameId);
+        else await resetGameClockDelay(client, gameId);
         await client.query("COMMIT");
         after(sendCrownAnnouncements);
         if (!result.winner) {
@@ -316,7 +300,6 @@ export async function manageDrawOffer(formData: FormData) {
   try {
     await client.query("BEGIN");
     const tournamentId = await lockTournamentGame(client, gameId);
-    await settleGameClock(client, gameId);
     changed = response === "offer"
       ? await offerDrawForPlayer(client, gameId, session.user.id)
       : await respondToDrawForPlayer(client, gameId, session.user.id, offerId, response);
