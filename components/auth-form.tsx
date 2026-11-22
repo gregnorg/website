@@ -12,6 +12,19 @@ export function AuthForm({ mode, allowSignup = false }: { mode: "login" | "signu
   const signup = mode === "signup";
   const hydrated = useHydrated();
 
+  function showSignupValidation(event: FormEvent<HTMLFormElement>) {
+    const field = event.target;
+    if (!(field instanceof HTMLInputElement) || field !== event.currentTarget.querySelector("input:invalid")) return;
+
+    if (field.name === "username") {
+      setError("Use 3–24 letters, numbers, periods, or underscores for your username.");
+    } else if (field.name === "identifier") {
+      setError("Enter a valid email address.");
+    } else if (field.name === "password") {
+      setError("Use 12–128 characters for your password.");
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -50,8 +63,8 @@ export function AuthForm({ mode, allowSignup = false }: { mode: "login" | "signu
     <section className="panel auth-panel">
       <h1>{signup ? "Create account" : "Log in"}</h1>
       <p>{signup ? "Make an account to start playing." : "Welcome back."}</p>
-      <form method="post" onSubmit={submit}>
-        {signup && <label>Username<input name="username" minLength={3} maxLength={24} pattern="[A-Za-z0-9_]+" required /></label>}
+      <form method="post" onSubmit={submit} onInvalidCapture={signup ? showSignupValidation : undefined}>
+        {signup && <label>Username<input name="username" minLength={3} maxLength={24} pattern="[A-Za-z0-9_.]+" required /></label>}
         <label>
           {signup ? "Email" : "Username or email"}
           <input
