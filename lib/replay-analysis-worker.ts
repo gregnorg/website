@@ -28,7 +28,7 @@ export async function processReplayAnalysis(client: PoolClient, options: {
       "SELECT game_id, cursor_step FROM pushfight_analysis_jobs WHERE state = 'pending' ORDER BY queued_at, game_id LIMIT 10",
     );
     for (const job of jobs.rows) {
-      const history = await loadGameHistory(job.game_id, client);
+      const history = await loadGameHistory(job.game_id, { db: client, allowTournament: true });
       if (!history) {
         await client.query("UPDATE pushfight_analysis_jobs SET state = 'invalid', last_error = 'No complete replay history' WHERE game_id = $1", [job.game_id]);
         counts.invalid++;

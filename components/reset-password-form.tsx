@@ -3,11 +3,13 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { useHydrated } from "./use-hydrated";
 
 export function ResetPasswordForm({ token, invalid }: { token?: string; invalid?: boolean }) {
   const [error, setError] = useState(invalid ? "This password reset link is invalid or has expired." : "");
   const [complete, setComplete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const hydrated = useHydrated();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,11 +45,11 @@ export function ResetPasswordForm({ token, invalid }: { token?: string; invalid?
       ) : (
         <>
           <p>Your new password must contain at least 12 characters.</p>
-          <form onSubmit={submit}>
+          <form method="post" onSubmit={submit}>
             <label>New password<input name="password" type="password" minLength={12} maxLength={128} autoComplete="new-password" required disabled={!token} /></label>
             <label>Confirm password<input name="confirmation" type="password" minLength={12} maxLength={128} autoComplete="new-password" required disabled={!token} /></label>
             {error && <p className="error" role="alert">{error}</p>}
-            <button className="button" disabled={busy || !token}>{busy ? "Resetting…" : "Reset password"}</button>
+            <button className="button" disabled={!hydrated || busy || !token}>{busy ? "Resetting…" : "Reset password"}</button>
           </form>
           <p className="switch"><Link href="/forgot-password">Request a new link</Link></p>
         </>

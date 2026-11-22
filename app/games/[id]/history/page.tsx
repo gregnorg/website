@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { loadGameHistory } from "@/lib/game-history-repository";
 import GameHistory from "@/components/game-history";
@@ -6,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 export default async function HistoryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const history = await loadGameHistory(id);
+  const session = await auth.api.getSession({ headers: await headers() });
+  const history = await loadGameHistory(id, { allowTournament: Boolean(session) });
   if (!history) notFound();
   const { game, frames } = history;
   return <section className="game-page">

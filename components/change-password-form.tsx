@@ -2,11 +2,13 @@
 
 import { FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { useHydrated } from "./use-hydrated";
 
 export function ChangePasswordForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
+  const hydrated = useHydrated();
   const [showPasswords, setShowPasswords] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -51,7 +53,7 @@ export function ChangePasswordForm() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <label>
         Current password
         <input
@@ -93,7 +95,7 @@ export function ChangePasswordForm() {
       </label>
       {error && <p className="error" role="alert">{error}</p>}
       {success && <p className="success" role="status">{success}</p>}
-      <button className="button" disabled={busy}>
+      <button className="button" disabled={!hydrated || busy}>
         {busy ? "Changing password…" : "Change password"}
       </button>
     </form>

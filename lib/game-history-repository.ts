@@ -3,9 +3,12 @@ import { pool } from "./db.ts";
 import { loadGameMoves } from "./game-moves.ts";
 import { completeGameHistory, type HistoryGame } from "./game-history.ts";
 
-export async function loadGameHistory(id: string, db: Pick<PoolClient, "query"> = pool) {
-  const result = await db.query<HistoryGame & { id: string; game_number: string; white_name: string; black_name: string }>(
-    `SELECT g.id, g.game_number, g.game_type, g.status, g.winner_id,
+export async function loadGameHistory(
+  id: string,
+  { db = pool, allowTournament = false }: { db?: Pick<PoolClient, "query">; allowTournament?: boolean } = {},
+) {
+  const result = await db.query<HistoryGame & { id: string; game_number: string; tournament_id: string | null; white_name: string; black_name: string }>(
+    `SELECT g.id, g.game_number, g.tournament_id, g.game_type, g.status, g.winner_id,
             w.user_id AS x_player_id, b.user_id AS o_player_id,
             wu.username AS white_name, bu.username AS black_name,
             (g.resigned_by_id IS NOT NULL OR g.idle_expired OR
@@ -15,7 +18,8 @@ export async function loadGameHistory(id: string, db: Pick<PoolClient, "query"> 
        JOIN game_players b ON b.game_id = g.id AND b.mark = 'O'
        JOIN "user" wu ON wu.id = w.user_id
        JOIN "user" bu ON bu.id = b.user_id
-      WHERE (g.id::text = $1 OR g.game_number::text = $1) AND (NOT g.idle_expired OR g.status = 'won')`, [id],
+      WHERE (g.id::text = $1 OR g.game_number::text = $1) AND (NOT g.idle_expired OR g.status = 'won')
+        AND (g.tournament_id IS NULL OR $2)`, [id, allowTournament],
   );
   const game = result.rows[0];
   if (!game) return null;

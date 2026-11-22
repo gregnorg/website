@@ -75,8 +75,18 @@ test("finished games queue transactionally; background results survive outages a
   await client.query("ROLLBACK TO SAVEPOINT finish_test");
   assert.equal((await client.query("SELECT 1 FROM pushfight_analysis_jobs WHERE game_id=$1", [game])).rowCount, 0);
   await resignGameForPlayer(client, game, black);
-  const history = await loadGameHistory(game, client);
+  const history = await loadGameHistory(game, { db: client });
   assert.ok(history);
+  await client.query("SAVEPOINT tournament_visibility");
+  const tournament = (await client.query(
+    "INSERT INTO tournaments(name, minutes, created_by) VALUES('Replay visibility', 5, $1) RETURNING id", [white],
+  )).rows[0].id;
+  await client.query("UPDATE games SET tournament_id=$2 WHERE id=$1", [game, tournament]);
+  for (const identifier of [game, history.game.game_number]) {
+    assert.equal(await loadGameHistory(identifier, { db: client }), null);
+    assert.equal((await loadGameHistory(identifier, { db: client, allowTournament: true }))?.game.id, game);
+  }
+  await client.query("ROLLBACK TO SAVEPOINT tournament_visibility");
   const frame1 = history.frames[3];
   const frame2 = history.frames[4];
   assert.ok(frame1.type === "pushfight" && frame1.turnEnd);

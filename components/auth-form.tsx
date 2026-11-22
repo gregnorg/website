@@ -3,12 +3,14 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { useHydrated } from "./use-hydrated";
 
 export function AuthForm({ mode, allowSignup = false }: { mode: "login" | "signup"; allowSignup?: boolean }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const signup = mode === "signup";
+  const hydrated = useHydrated();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,7 +50,7 @@ export function AuthForm({ mode, allowSignup = false }: { mode: "login" | "signu
     <section className="panel auth-panel">
       <h1>{signup ? "Create account" : "Log in"}</h1>
       <p>{signup ? "Make an account to start playing." : "Welcome back."}</p>
-      <form onSubmit={submit}>
+      <form method="post" onSubmit={submit}>
         {signup && <label>Username<input name="username" minLength={3} maxLength={24} pattern="[A-Za-z0-9_]+" required /></label>}
         <label>
           {signup ? "Email" : "Username or email"}
@@ -82,7 +84,7 @@ export function AuthForm({ mode, allowSignup = false }: { mode: "login" | "signu
         </label>
         {!signup && <Link className="forgot-password-link" href="/forgot-password">Forgot password?</Link>}
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="button" disabled={busy}>{busy ? "Please wait…" : signup ? "Create account" : "Log in"}</button>
+        <button className="button" disabled={!hydrated || busy}>{busy ? "Please wait…" : signup ? "Create account" : "Log in"}</button>
       </form>
       {(signup || allowSignup) && (
         <p className="switch">{signup ? "Already have an account?" : "Need an account?"} <Link href={signup ? "/login" : "/signup"}>{signup ? "Log in" : "Sign up"}</Link></p>
