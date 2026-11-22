@@ -58,6 +58,13 @@ the PostgreSQL server tools locally; set `TEST_POSTGRES_BIN` if they are outside
 `/usr/lib/postgresql/<version>/bin`. Without `DATABASE_URL`, database tests skip.
 Each test file has a 30-second timeout so lock failures cannot stall a release.
 
+`npm run test:browser` runs Chrome against a separate development-server copy
+and a disposable database. It covers authentication, timed setup and moves,
+preview reconnects, and slow preview uploads. Install Google Chrome, or set
+`E2E_BROWSER_CHANNEL=chromium` after running `npx playwright install chromium`.
+Failure screenshots and traces are stored in `output/browser-results/`.
+Playwright flags can be passed after `--`, for example `--grep "login"`.
+
 For development on Linux Mint or Ubuntu, run Node.js and PostgreSQL locally.
 On Windows, run both inside WSL. Production currently runs on Linux Mint with
 systemd and a Cloudflare Tunnel.

@@ -9,6 +9,7 @@
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint .",
     "test": "node --env-file-if-exists=.env.local scripts/run-tests.mjs",
+    "test:browser": "node --env-file-if-exists=.env.local scripts/run-browser-tests.mjs",
     "migrate": "node scripts/apply-migration.js",
     "games:analysis:resume": "node --env-file-if-exists=.env.local scripts/resume-replay-analysis.ts",
     "games:analyze": "node --env-file-if-exists=.env.local scripts/process-replay-analysis.ts",
@@ -30,6 +31,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/node": "latest",
     "@types/pg": "latest",
     "@types/react": "latest",
