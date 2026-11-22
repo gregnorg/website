@@ -22,6 +22,7 @@ import {
   type PlayerMark,
 } from "@/lib/game-state";
 import RefreshOnReturn from "@/components/refresh-on-return";
+import { ClockPreview } from "@/components/clock-preview";
 import { GameClocks } from "@/components/game-clocks";
 import GameChat from "@/components/game-chat";
 import { completeGameHistory } from "@/lib/game-history";
@@ -137,18 +138,25 @@ export default async function GamePage({
     }
   }
 
-  let nextTurnGameId: string | null = null;
-  if (isPlayer && moved === "1" && !game.tournament_id) {
+  const nextGame = isPlayer && moved === "1" && !game.tournament_id
+    ? await loadNextTurnGame()
+    : undefined;
+
+  async function loadNextTurnGame() {
     const candidates = await pool.query<{
       id: string;
       game_type: GameType;
+      time_control_seconds: number | null;
+      my_time_remaining_ms: string | null;
+      opponent_time_remaining_ms: string | null;
       x_player_id: string;
       o_player_id: string;
       move_count: number;
       setup_move_count: number;
       last_turn_player_id: string | null;
     }>(
-      `SELECT g.id, g.game_type,
+      `SELECT g.id, g.game_type, g.time_control_seconds,
+              me.time_remaining_ms AS my_time_remaining_ms, them.time_remaining_ms AS opponent_time_remaining_ms,
               xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id,
               COUNT(m.id)::int AS move_count,
               COUNT(m.id) FILTER (WHERE m.payload->>'type' = 'setup')::int AS setup_move_count,
@@ -157,17 +165,19 @@ export default async function GamePage({
          FROM games g
          JOIN game_players me
            ON me.game_id = g.id AND me.user_id = $1
+         JOIN game_players them
+           ON them.game_id = g.id AND them.user_id <> $1
          JOIN game_players xplayer
            ON xplayer.game_id = g.id AND xplayer.mark = 'X'
          JOIN game_players oplayer
            ON oplayer.game_id = g.id AND oplayer.mark = 'O'
          LEFT JOIN moves m ON m.game_id = g.id
         WHERE g.tournament_id IS NULL AND g.status = 'active' AND me.cleared_at IS NULL AND g.id <> $2
-        GROUP BY g.id, xplayer.user_id, oplayer.user_id
+        GROUP BY g.id, me.time_remaining_ms, them.time_remaining_ms, xplayer.user_id, oplayer.user_id
         ORDER BY g.updated_at DESC`,
       [viewerId, id],
     );
-    nextTurnGameId = candidates.rows.find((candidate) => getCurrentPlayerId(
+    return candidates.rows.find((candidate) => getCurrentPlayerId(
       candidate.game_type,
       candidate.x_player_id,
       candidate.o_player_id,
@@ -176,7 +186,7 @@ export default async function GamePage({
         setupMoveCount: candidate.setup_move_count,
         lastTurnPlayerId: candidate.last_turn_player_id,
       },
-    ) === viewerId)?.id ?? null;
+    ) === viewerId);
   }
 
   let summary = `Waiting for ${game.opponent_username} to move.`;
@@ -236,7 +246,13 @@ export default async function GamePage({
       {isPlayer && moved === "1" && (
         <div className="after-move" role="status">
           <span>Move submitted.</span>
-          {game.tournament_id ? <Link href="/tournaments">View tournament bracket →</Link> : nextTurnGameId ? <Link href={`/games/${nextTurnGameId}`}>Play your next game →</Link> : <Link href="/games">View my games</Link>}
+          {game.tournament_id ? <Link href="/tournaments">View tournament bracket →</Link>
+            : nextGame ? <Link href={`/games/${nextGame.id}`}>
+              Play your next game →
+              {nextGame.time_control_seconds !== null && (
+                <ClockPreview mine={nextGame.my_time_remaining_ms} opponent={nextGame.opponent_time_remaining_ms} />
+              )}
+            </Link> : <Link href="/games">View my games</Link>}
         </div>
       )}
       {game.tournament_id ? <TournamentClocks key={`${id}:${game.server_now.getTime()}`} delaySeconds={game.delay_seconds ?? 10} myColor={game.my_mark === "X" ? "white" : "black"} myName={game.my_username} opponentName={game.opponent_username}

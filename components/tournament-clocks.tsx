@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatClock } from "@/lib/format-clock";
 import { ChampionCrown } from "@/components/champion-crown";
 
 type Props = {
@@ -18,11 +19,6 @@ type Props = {
   startedAt: number | null;
   serverNow: number;
 };
-
-export function formatClock(milliseconds: number) {
-  const total = Math.ceil(Math.max(0, milliseconds) / 1000);
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
 
 export function TournamentClocks({
   myName, opponentName, myRemainingMs, opponentRemainingMs, myTurn, opponentTurn,

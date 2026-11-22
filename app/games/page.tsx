@@ -8,6 +8,7 @@ import { MY_GAME_FINISHED_SQL } from "@/lib/game-repository";
 import { markGameAsFinished } from "./actions";
 import { currentPlayerId, type GameStatus, type GameType, type PlayerMark } from "@/lib/game-state";
 import RefreshOnReturn from "@/components/refresh-on-return";
+import { ClockPreview } from "@/components/clock-preview";
 import { ChampionCrown } from "@/components/champion-crown";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,8 @@ export default async function GamesPage({ searchParams }: {
     resigned_by_id: string | null; idle_expired: boolean;
     game_type: GameType;
     time_control_seconds: number | null;
+    my_time_remaining_ms: string | null;
+    opponent_time_remaining_ms: string | null;
     my_mark: PlayerMark;
     x_player_id: string;
     o_player_id: string;
@@ -37,6 +40,7 @@ export default async function GamesPage({ searchParams }: {
   }>(
     `SELECT g.game_number, g.id, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.game_type,
             g.time_control_seconds, me.mark AS my_mark,
+            me.time_remaining_ms AS my_time_remaining_ms, them.time_remaining_ms AS opponent_time_remaining_ms,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
             COUNT(m.id)::int AS move_count,
@@ -57,7 +61,7 @@ export default async function GamesPage({ searchParams }: {
        LEFT JOIN moves m
          ON m.game_id = g.id
       WHERE g.tournament_id IS NULL AND ${MY_GAME_FINISHED_SQL} = $2
-      GROUP BY g.id, me.mark, xplayer.user_id, oplayer.user_id, opponent.id, opponent.username
+      GROUP BY g.id, me.mark, me.time_remaining_ms, them.time_remaining_ms, xplayer.user_id, oplayer.user_id, opponent.id, opponent.username
       ORDER BY g.updated_at DESC`,
     [session.user.id, finished],
   ), pool.query<{ user_id: string }>("SELECT user_id FROM champion_state WHERE singleton = true")]);
@@ -116,6 +120,9 @@ export default async function GamesPage({ searchParams }: {
                     </span>
                   </h2>
                   <p>Game #{game.game_number} · {game.game_type === "tic_tac_toe" ? `Tic-tac-toe · ${timeControl}` : timeControl}</p>
+                  {game.status === "active" && game.time_control_seconds !== null && (
+                    <ClockPreview mine={game.my_time_remaining_ms} opponent={game.opponent_time_remaining_ms} />
+                  )}
                 </div>
                 <span className="status">
                   {game.idle_expired && game.status === "won"

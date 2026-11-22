@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChampionCrown } from "@/components/champion-crown";
-import { formatClock } from "@/components/tournament-clocks";
+import { formatClock } from "@/lib/format-clock";
 
 type Props = {
   gameId: string;
