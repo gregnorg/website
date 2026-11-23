@@ -52,6 +52,42 @@ export async function createGameRecord(
   return gameId;
 }
 
+// The caller owns the transaction so the original game stays locked until the rematch is saved.
+export async function createRematchForPlayer(
+  client: PoolClient,
+  originalId: string,
+  playerId: string,
+): Promise<{ gameId: string; firstPlayerId?: string } | null> {
+  const { rows: [original] } = await client.query<{
+    game_type: GameType;
+    time_control_seconds: number | null;
+    mark: PlayerMark;
+    opponent_id: string;
+  }>(
+    `SELECT g.game_type, g.time_control_seconds, me.mark, opponent.user_id AS opponent_id
+       FROM games g
+       JOIN game_players me ON me.game_id = g.id AND me.user_id = $2
+       JOIN game_players opponent ON opponent.game_id = g.id AND opponent.user_id <> me.user_id
+      WHERE g.id = $1 AND g.status = 'won'
+      FOR UPDATE OF g`,
+    [originalId, playerId],
+  );
+  if (!original) return null;
+
+  const { rows: [existing] } = await client.query<{ id: string }>(
+    "SELECT id FROM games WHERE rematch_of = $1",
+    [originalId],
+  );
+  if (existing) return { gameId: existing.id };
+
+  const mark = original.mark === "X" ? "O" : "X";
+  const gameId = await createGameRecord(
+    client, playerId, original.opponent_id, original.game_type, mark, original.time_control_seconds,
+  );
+  await client.query("UPDATE games SET rematch_of = $1 WHERE id = $2", [originalId, gameId]);
+  return { gameId, firstPlayerId: mark === "X" ? playerId : original.opponent_id };
+}
+
 export async function clearFinishedGameForPlayer(
   client: PoolClient,
   gameId: string,

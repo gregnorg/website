@@ -189,3 +189,6 @@ CREATE INDEX tournament_move_previews_game_idx ON tournament_move_previews(game_
 
 ALTER TABLE tournaments
   ADD COLUMN delay_seconds INTEGER NOT NULL DEFAULT 10 CHECK (delay_seconds >= 0);
+
+ALTER TABLE games
+  ADD COLUMN rematch_of UUID UNIQUE REFERENCES games(id) ON DELETE SET NULL;

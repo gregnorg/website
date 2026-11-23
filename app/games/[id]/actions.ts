@@ -12,11 +12,38 @@ import { pool } from "@/lib/db";
 import { loadGameMoves } from "@/lib/game-moves";
 import { Board, EMPTY_BOARD, isDraw, play, winner } from "@/lib/game";
 import { applyMove, emptyBoard as pfInitialBoard, MovePayload, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
-import { getMoveGameForPlayer, resignGameForPlayer, offerDrawForPlayer, respondToDrawForPlayer } from "@/lib/game-repository";
+import { createRematchForPlayer, getMoveGameForPlayer, resignGameForPlayer, offerDrawForPlayer, respondToDrawForPlayer } from "@/lib/game-repository";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type PlayerMark } from "@/lib/game-state";
 import { sendTurnNotification } from "@/lib/turn-email";
 import { transferChampionship } from "@/lib/championship";
 import { resetGameClockDelay } from "@/lib/game-clock";
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function rematchGame(gameId: string) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/login");
+  if (typeof gameId !== "string" || !uuid.test(gameId)) redirect("/games?error=Rematch+unavailable.");
+
+  const client = await pool.connect();
+  let rematch;
+  try {
+    await client.query("BEGIN");
+    rematch = await createRematchForPlayer(client, gameId, session.user.id);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  if (!rematch) redirect("/games?error=Rematch+unavailable.");
+  const { gameId: rematchId, firstPlayerId } = rematch;
+  if (firstPlayerId) after(() => sendTurnNotification(rematchId, firstPlayerId));
+  revalidatePath("/games");
+  redirect(`/games/${rematchId}`);
+}
 
 export async function resignGame(formData: FormData) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -288,7 +315,6 @@ export async function manageDrawOffer(formData: FormData) {
   const gameId = String(formData.get("gameId") ?? "");
   const offerId = String(formData.get("offerId") ?? "");
   const response = String(formData.get("response") ?? "");
-  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuid.test(gameId)) redirect("/games");
   if (response !== "offer" && response !== "accept" && response !== "decline" && response !== "withdraw") {
     redirect(`/games/${gameId}`);

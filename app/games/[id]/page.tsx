@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { loadGameMoves } from "@/lib/game-moves";
 import { Board, EMPTY_BOARD } from "@/lib/game";
-import { makeMove, resignGame, manageDrawOffer } from "./actions";
+import { makeMove, rematchGame, resignGame, manageDrawOffer } from "./actions";
 import PushfightBoard from "@/components/pushfight-board";
 import { applyMove, emptyBoard, movesSinceLastPush, normalizeMovePayload } from "@/lib/pushfight";
 import { TicTacToeBoard } from "@/components/tic-tac-toe-board";
@@ -42,6 +42,7 @@ export default async function GamePage({
 
   const [gameResult, championResult] = await Promise.all([pool.query<{
     id: string;
+    rematch_id: string | null;
     tournament_id: string | null;
     clock_started_at: Date | null;
     clock_delay_remaining_ms: number;
@@ -65,11 +66,12 @@ export default async function GamePage({
     opponent_time_remaining_ms: string | null;
   }>(
     `SELECT g.id, g.tournament_id, g.clock_started_at, g.clock_delay_remaining_ms, clock_timestamp() AS server_now, (SELECT delay_seconds FROM tournaments WHERE id=g.tournament_id) AS delay_seconds, g.game_number, mine.username AS my_username, g.status, g.winner_id, g.resigned_by_id, g.idle_expired, g.draw_offered_by_id, g.draw_offer_id, g.game_type, g.time_control_seconds,
-            me.mark AS my_mark, me.time_remaining_ms AS my_time_remaining_ms,
+            rematch.id AS rematch_id, me.mark AS my_mark, me.time_remaining_ms AS my_time_remaining_ms,
             them.time_remaining_ms AS opponent_time_remaining_ms,
             opponent.username AS opponent_username, opponent.id AS opponent_id,
             xplayer.user_id AS x_player_id, oplayer.user_id AS o_player_id
        FROM games g
+       LEFT JOIN games rematch ON rematch.rematch_of = g.id
        JOIN game_players me
          ON me.game_id = g.id AND me.mark = CASE WHEN EXISTS (SELECT 1 FROM game_players viewer WHERE viewer.game_id = g.id AND viewer.user_id = $2 AND viewer.mark = 'O') THEN 'O'::player_mark ELSE 'X'::player_mark END
        JOIN game_players them
@@ -320,6 +322,15 @@ export default async function GamePage({
             replayEnabled={replayEnabled}
           />
         </>
+      )}
+      {isPlayer && game.status === "won" && (
+        <div className="game-end-actions">
+          {game.rematch_id
+            ? <Link className="button" href={`/games/${game.rematch_id}`}>Open rematch</Link>
+            : <form action={rematchGame.bind(null, id)}>
+                <button className="button" type="submit">Rematch</button>
+              </form>}
+        </div>
       )}
       {isPlayer && game.status === "active" && (
         <>

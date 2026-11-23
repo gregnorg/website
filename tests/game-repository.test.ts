@@ -6,6 +6,7 @@ import {
   clearFinishedGameForPlayer,
   MY_GAME_FINISHED_SQL,
   createGameRecord,
+  createRematchForPlayer,
   getMoveGameForPlayer,
   resignGameForPlayer,
   offerDrawForPlayer,
@@ -73,8 +74,20 @@ test("game database operations enforce membership and finished-game clearing", a
   assert.equal(await getMoveGameForPlayer(client, gameId, outsiderId), null);
   assert.equal(await getMoveGameForPlayer(client, randomUUID(), creatorId), null);
 
+  assert.equal(await createRematchForPlayer(client, gameId, creatorId), null);
   assert.equal(await clearFinishedGameForPlayer(client, gameId, creatorId), false);
   await client.query("UPDATE games SET status = 'won', winner_id = $2 WHERE id = $1", [gameId, creatorId]);
+  assert.equal(await createRematchForPlayer(client, gameId, outsiderId), null);
+  const rematch = await createRematchForPlayer(client, gameId, opponentId);
+  assert.ok(rematch);
+  assert.notEqual(rematch.gameId, gameId);
+  assert.equal(rematch.firstPlayerId, creatorId);
+  assert.deepEqual(await createRematchForPlayer(client, gameId, creatorId), { gameId: rematch.gameId });
+  assert.deepEqual(await getMoveGameForPlayer(client, rematch.gameId, creatorId), {
+    status: "active",
+    game_type: "pushfight",
+    my_mark: "X",
+  });
   assert.equal(await clearFinishedGameForPlayer(client, gameId, creatorId), true);
   const cleared = await client.query<{ user_id: string; cleared_at: Date | null }>(
     "SELECT user_id, cleared_at FROM game_players WHERE game_id = $1 ORDER BY mark",
@@ -189,6 +202,7 @@ test("game database operations enforce membership and finished-game clearing", a
     assert.equal(await offerDrawForPlayer(client, finishedGame, creatorId), true);
     const finishedOffer = (await client.query("SELECT draw_offer_id FROM games WHERE id = $1", [finishedGame])).rows[0].draw_offer_id;
     assert.equal(await resignGameForPlayer(client, finishedGame, opponentId), true);
+    assert.ok(await createRematchForPlayer(client, finishedGame, opponentId));
     assert.equal(await respondToDrawForPlayer(client, finishedGame, opponentId, finishedOffer, "accept"), false);
     assert.equal((await client.query("SELECT draw_offer_id FROM games WHERE id = $1", [finishedGame])).rows[0].draw_offer_id, null);
   });
