@@ -5,6 +5,7 @@ import { pool } from "@/lib/db";
 import { loadGameMoves } from "@/lib/game-moves";
 import { settleGameClock } from "@/lib/game-clock";
 import { currentPlayerId, isSetupPhase, summarizeTurns, type GameType } from "@/lib/game-state";
+import { analyzeFinishedReplay } from "@/lib/replay-analysis-worker";
 import { sendCrownAnnouncements } from "@/lib/crown-email";
 import { isChatOriginAllowed } from "@/lib/game-chat";
 import { readJsonObject, RequestBodyError } from "@/lib/request-body";
@@ -50,7 +51,10 @@ export async function POST(request: Request) {
       JOIN game_players o ON o.game_id=g.id AND o.mark='O' WHERE g.id=$1`, [gameId, session.user.id])).rows[0];
     const summary = summarizeTurns(await loadGameMoves(client, gameId));
     await client.query("COMMIT");
-    if (timedOut) after(sendCrownAnnouncements);
+    if (timedOut) {
+      after(sendCrownAnnouncements);
+      if (game.game_type === "pushfight") after(() => analyzeFinishedReplay(gameId));
+    }
     return Response.json({
       status: game.status,
       myTurn: !isSetupPhase(game.game_type, summary) && currentPlayerId(game.game_type, game.x, game.o, summary) === session.user.id,

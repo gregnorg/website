@@ -16,6 +16,7 @@ import { createRematchForPlayer, getMoveGameForPlayer, resignGameForPlayer, offe
 import { currentPlayerId, isSetupPhase, summarizeTurns, type PlayerMark } from "@/lib/game-state";
 import { sendTurnNotification } from "@/lib/turn-email";
 import { transferChampionship } from "@/lib/championship";
+import { analyzeFinishedReplay } from "@/lib/replay-analysis-worker";
 import { resetGameClockDelay } from "@/lib/game-clock";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -56,10 +57,11 @@ export async function resignGame(formData: FormData) {
   try {
     await client.query("BEGIN");
     const tournamentId = await lockTournamentGame(client, gameId);
-    await resignGameForPlayer(client, gameId, session.user.id);
+    const resigned = await resignGameForPlayer(client, gameId, session.user.id);
     if (tournamentId) await settleTournament(client, tournamentId);
     await client.query("COMMIT");
     after(sendCrownAnnouncements);
+    if (resigned && !tournamentId) after(() => analyzeFinishedReplay(gameId));
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -273,6 +275,7 @@ export async function makeMove(formData: FormData) {
         else await resetGameClockDelay(client, gameId);
         await client.query("COMMIT");
         after(sendCrownAnnouncements);
+        if (result.winner && !tournamentId) after(() => analyzeFinishedReplay(gameId));
         if (!result.winner) {
           const nextSummary = summarizeTurns([
             ...moves,
@@ -332,6 +335,7 @@ export async function manageDrawOffer(formData: FormData) {
     if (tournamentId) await settleTournament(client, tournamentId);
     await client.query("COMMIT");
     after(sendCrownAnnouncements);
+    if (changed && response === "accept" && !tournamentId) after(() => analyzeFinishedReplay(gameId));
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

@@ -38,9 +38,11 @@ with `bash deploy/install-analysis-cron.sh --print`. To roll back this deploymen
 remove the block labeled `SHOVEACTUALLY REPLAY ANALYSIS` from the app user's
 crontab instead of disabling system timers.
 
-A manual batch is `npm run games:analyze`. The worker makes at most 20 position
-lookups per batch, waits at least one second between them, and stops starting new
-lookups after 45 seconds. An advisory lock prevents overlapping invocations.
+Game completion starts background analysis after the finish commits. The worker
+looks up uncached positions back-to-back and saves each result. The scheduled
+worker picks up jobs that could not run immediately or were interrupted. An
+advisory lock prevents overlapping invocations. Run the scheduled worker
+manually with `npm run games:analyze`.
 Each position is saved before its game's cursor advances. A crash or a later
 batch resumes without requesting previously saved positions.
 

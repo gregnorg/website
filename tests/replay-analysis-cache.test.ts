@@ -99,23 +99,24 @@ test("finished games queue transactionally; background results survive outages a
 
   let requests = 0;
   const lookup = async () => { requests++; return { status: "W2", source: solverEndpoints()[0] }; };
-  const partial = await processReplayAnalysis(client, { lookup, maxLookups: 1, minDelayMs: 0 });
+  const partial = await processReplayAnalysis(client, { lookup, maxLookups: 1 });
   assert.equal(partial.lookups, 1);
   assert.equal(partial.completed, 0);
   assert.equal(requests, 1);
   assert.deepEqual(await cachedReplayAnalysis(client, game, frame1), { label: "Black wins in 2 turns", pending: false });
   assert.equal((await client.query("SELECT cursor_step FROM pushfight_analysis_jobs WHERE game_id=$1", [game])).rows[0].cursor_step, 3);
 
-  const outage = await processReplayAnalysis(client, { minDelayMs: 0, lookup: async () => { requests++; return null; } });
+  const outage = await processReplayAnalysis(client, { lookup: async () => { requests++; return null; } });
   assert.equal(outage.cooldown, true);
   assert.equal(requests, 2);
   assert.deepEqual(await cachedReplayAnalysis(client, game, frame1), { label: "Black wins in 2 turns", pending: false });
   assert.deepEqual(await cachedReplayAnalysis(client, game, frame2), { label: "Analysis temporarily unavailable; retry scheduled", pending: true });
-  const cooldown = await processReplayAnalysis(client, { lookup, minDelayMs: 0 });
+  const cooldown = await processReplayAnalysis(client, { lookup });
   assert.equal(cooldown.cooldown, true);
   assert.equal(requests, 2, "persisted cooldown prevents more requests even in a new worker invocation");
   await client.query("UPDATE pushfight_analysis_provider_state SET next_attempt_at = now() WHERE id = 1");
-  await processReplayAnalysis(client, { lookup, minDelayMs: 0 });
+  const finishedReplay = await processReplayAnalysis(client, { gameId: game, lookup });
+  assert.equal(finishedReplay.completed, 1);
   assert.equal(requests, 3, "resume skips the first saved position");
   assert.deepEqual(await cachedReplayAnalysis(client, game, frame2), { label: "White wins in 2 turns", pending: false });
   assert.equal((await client.query("SELECT state FROM pushfight_analysis_jobs WHERE game_id=$1", [game])).rows[0].state, "completed");
@@ -167,7 +168,7 @@ test("finished games queue transactionally; background results survive outages a
     assert.equal(again.stopped, true);
     assert.equal(called, false);
     await resumeReplayAnalysis(client);
-    const resumed = await processReplayAnalysis(client, { lookup, minDelayMs: 0 });
+    const resumed = await processReplayAnalysis(client, { lookup });
     assert.equal(resumed.lookups, 1);
     assert.equal(resumed.completed, 1);
     assert.deepEqual(await cachedReplayAnalysis(client, pending, frame2), { label: "White wins in 2 turns", pending: false });

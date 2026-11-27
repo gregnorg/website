@@ -2,6 +2,7 @@ import { sendCrownAnnouncements } from "../lib/crown-email.ts";
 import { Resend } from "resend";
 import { pool } from "../lib/db.ts";
 import { processIdleGame, type IdleReminder } from "../lib/idle-games.ts";
+import { analyzeFinishedReplay } from "../lib/replay-analysis-worker.ts";
 
 const dryRun = process.argv.includes("--dry-run");
 const siteUrl = process.env.PUBLIC_SITE_URL ?? "https://shoveactually.com";
@@ -33,6 +34,7 @@ try {
       const result = await processIdleGame(client, game.id, { sendReminder, siteUrl, dryRun });
       await client.query(dryRun ? "ROLLBACK" : "COMMIT");
       counts[result]++;
+      if (!dryRun && result === "forfeited") await analyzeFinishedReplay(game.id);
     } catch (error) {
       await client.query("ROLLBACK");
       counts.failed++;
